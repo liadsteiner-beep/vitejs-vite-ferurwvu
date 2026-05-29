@@ -1,4 +1,23 @@
 import { useState, useEffect, useRef } from "react";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
+
+// ─── FIREBASE ─────────────────────────────────────────────────────────────────
+const firebaseApp = initializeApp({
+  apiKey: "AIzaSyB2w6kVjNJ5nMHNMvd0gOxvEBu5Vp6y4KI",
+  authDomain: "harish-pharmacy.firebaseapp.com",
+  projectId: "harish-pharmacy",
+  storageBucket: "harish-pharmacy.firebasestorage.app",
+  messagingSenderId: "362049883380",
+  appId: "1:362049883380:web:5d61d2e41f6d08e99a22a1",
+});
+const db = getFirestore(firebaseApp);
+
+async function fbSave(data) {
+  try {
+    await setDoc(doc(db, "pharmacy", "schedule"), data);
+  } catch(e) { console.error("Firebase save error:", e); }
+}
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const APP_NAME = "סידור עבודה בית מרקחת חריש";
@@ -55,6 +74,12 @@ const DAY_SHIFTS = {
 const STORAGE_KEY = "pharmacy_harishv1";
 const MANAGER_PASSWORD_DEFAULT = "liad2903";
 
+function loadLocalData() { try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; } }
+function saveData(d) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {}
+  fbSave(d);
+}
+
 // ─── DATE HELPERS ─────────────────────────────────────────────────────────────
 function getNextWeekDates() {
   const today = new Date();
@@ -79,9 +104,6 @@ function getDeadline() {
 }
 
 function isPastDeadline() { return new Date() > getDeadline(); }
-
-function loadData() { try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; } }
-function saveData(d) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {} }
 
 const WEEK_DATES = getNextWeekDates();
 
@@ -268,24 +290,44 @@ export default function App() {
   const fileRef = useRef(null);
 
   useEffect(() => {
-    const d = loadData();
-    if (!d) return;
-    if (d.employees) {
-      const hasOldNames = d.employees.some(e => ["פרח 1","פרח 2","פרח 3"].includes(e.name));
-      if (!hasOldNames) setEmployees(d.employees);
+    // First load from localStorage as fast fallback
+    const local = loadLocalData();
+    if (local) {
+      if (local.employees) {
+        const hasOldNames = local.employees.some(e => ["פרח 1","פרח 2","פרח 3"].includes(e.name));
+        if (!hasOldNames) setEmployees(local.employees);
+      }
+      if (local.availability) setAvailability(local.availability);
+      if (local.assigned)     setAssigned(local.assigned);
+      if (local.notes)        setNotes(local.notes);
+      if (local.empNotes)     setEmpNotes(local.empNotes);
+      if (local.empPasswords) setEmpPasswords(local.empPasswords);
+      if (local.managerPassword && local.managerPassword !== "harishpharm2025") setManagerPassword(local.managerPassword);
+      if (local.fridayRota)   setFridayRota(local.fridayRota);
+      if (local.published)    setPublished(local.published);
+      if (local.dayRemarks)   setDayRemarks(local.dayRemarks);
+      if (local.shiftNotes)   setShiftNotes(local.shiftNotes);
     }
-    if (d.availability) setAvailability(d.availability);
-    if (d.assigned)     setAssigned(d.assigned);
-    if (d.notes)        setNotes(d.notes);
-    if (d.empNotes)     setEmpNotes(d.empNotes);
-    if (d.empPasswords)    setEmpPasswords(d.empPasswords);
-    if (d.managerPassword && d.managerPassword !== "harishpharm2025") {
-      setManagerPassword(d.managerPassword);
-    }
-    if (d.fridayRota)   setFridayRota(d.fridayRota);
-    if (d.published)    setPublished(d.published);
-    if (d.dayRemarks)   setDayRemarks(d.dayRemarks);
-    if (d.shiftNotes)   setShiftNotes(d.shiftNotes);
+    // Then subscribe to Firebase for real-time updates
+    const unsub = onSnapshot(doc(db, "pharmacy", "schedule"), (snap) => {
+      if (!snap.exists()) return;
+      const d = snap.data();
+      if (d.employees) {
+        const hasOldNames = d.employees.some(e => ["פרח 1","פרח 2","פרח 3"].includes(e.name));
+        if (!hasOldNames) setEmployees(d.employees);
+      }
+      if (d.availability) setAvailability(d.availability);
+      if (d.assigned)     setAssigned(d.assigned);
+      if (d.notes)        setNotes(d.notes);
+      if (d.empNotes)     setEmpNotes(d.empNotes);
+      if (d.empPasswords) setEmpPasswords(d.empPasswords);
+      if (d.managerPassword && d.managerPassword !== "harishpharm2025") setManagerPassword(d.managerPassword);
+      if (d.fridayRota)   setFridayRota(d.fridayRota);
+      if (d.published)    setPublished(d.published);
+      if (d.dayRemarks)   setDayRemarks(d.dayRemarks);
+      if (d.shiftNotes)   setShiftNotes(d.shiftNotes);
+    });
+    return () => unsub();
   }, []);
 
   useEffect(() => {
