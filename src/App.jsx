@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import * as React from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
 
@@ -81,31 +82,52 @@ function saveData(d) {
 }
 
 // ─── DATE HELPERS ─────────────────────────────────────────────────────────────
-function getNextWeekDates() {
+// Returns the start of the scheduling week:
+// - Before publish: next week (Sun after this week)
+// - After publish: week after next
+// - Thu/Fri/Sat: always one week further
+function getSchedulingWeekStart(offsetWeeks = 0, isPublished = false) {
   const today = new Date();
-  const day = today.getDay();
+  const day = today.getDay(); // 0=Sun ... 6=Sat
+  // Base: if Thu(4)/Fri(5)/Sat(6) add extra week
+  const baseExtra = day >= 4 ? 1 : 0;
+  // If published, show the week after the current scheduling week
+  const publishedExtra = isPublished ? 1 : 0;
   const sunday = new Date(today);
+  // Next Sunday
   sunday.setDate(today.getDate() + (7 - day));
-  sunday.setHours(0,0,0,0);
-  return Array.from({ length: 7 }, (_, i) => { const d = new Date(sunday); d.setDate(sunday.getDate() + i); return d; });
+  // Add extras
+  sunday.setDate(sunday.getDate() + (baseExtra + publishedExtra + offsetWeeks) * 7);
+  sunday.setHours(0, 0, 0, 0);
+  return sunday;
 }
+
+function getWeekDates(offsetWeeks = 0, isPublished = false) {
+  const sunday = getSchedulingWeekStart(offsetWeeks, isPublished);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    return d;
+  });
+}
+
 function formatDate(d) { return d.toLocaleDateString("he-IL", { weekday:"long", day:"numeric", month:"numeric" }); }
 function formatDateShort(d) { return d.toLocaleDateString("he-IL", { day:"numeric", month:"numeric" }); }
 function dateKey(d) { return d.toISOString().split("T")[0]; }
 function isFirstOfMonth(d) { return d.getDate() === 1; }
 
-// Deadline: next Tuesday 12:00
-function getDeadline() {
-  const dates = getNextWeekDates();
-  const tuesday = dates[2]; // index 2 = Tuesday
+// Deadline: next Tuesday 12:00 of the scheduling week
+function getDeadline(offsetWeeks = 0) {
+  const dates = getWeekDates(offsetWeeks);
+  const tuesday = dates[2];
   const dl = new Date(tuesday);
   dl.setHours(12, 0, 0, 0);
   return dl;
 }
 
-function isPastDeadline() { return new Date() > getDeadline(); }
+function isPastDeadline(offsetWeeks = 0) { return new Date() > getDeadline(offsetWeeks); }
 
-const WEEK_DATES = getNextWeekDates();
+const WEEK_DATES = getWeekDates(0); // default for auto-assign algorithm
 
 // ─── AUTO-ASSIGN ALGORITHM ───────────────────────────────────────────────────
 function autoAssign(employees, availability, fridayRota, assigned) {
@@ -119,7 +141,7 @@ function autoAssign(employees, availability, fridayRota, assigned) {
   // Count assigned shifts per employee
   const countShifts = (empId) => {
     let total = 0, morning = 0, evening = 0;
-    WEEK_DATES.forEach(date => {
+    weekDates.forEach(date => {
       const dayShifts = DAY_SHIFTS[date.getDay()] || [];
       dayShifts.forEach(sh => {
         ROLES.forEach(role => {
@@ -148,17 +170,22 @@ function autoAssign(employees, availability, fridayRota, assigned) {
   };
 
   // 1. Apply Friday rota for pharmacists
-  const friday = WEEK_DATES[5];
-  fridayRota.forEach(entry => {
-    const emp = employees.find(e => e.name === entry.name && e.role === "רוקח");
-    if (!emp) return;
-    const shiftId = entry.shift === "פתיחה" ? "open" : "close";
-    const current = getA(friday, shiftId, "רוקח");
-    if (!current.includes(emp.id)) setA(friday, shiftId, "רוקח", [...current, emp.id]);
-  });
+  const friday = weekDates[5];
+  const fridayDateLabel = friday.toLocaleDateString("he-IL",{day:"numeric",month:"numeric",year:"numeric"});
+  const fridayEntry = fridayRota.find(r => r.date === fridayDateLabel);
+  if (fridayEntry) {
+    if (fridayEntry.open) {
+      const emp = employees.find(e => e.name === fridayEntry.open && e.role === "רוקח");
+      if (emp) { const cur = getA(friday,"open","רוקח"); if(!cur.includes(emp.id)) setA(friday,"open","רוקח",[...cur,emp.id]); }
+    }
+    if (fridayEntry.close) {
+      const emp = employees.find(e => e.name === fridayEntry.close && e.role === "רוקח");
+      if (emp) { const cur = getA(friday,"close","רוקח"); if(!cur.includes(emp.id)) setA(friday,"close","רוקח",[...cur,emp.id]); }
+    }
+  }
 
   // 2. Drug closing on 1st of month: add ליעד to morning with note
-  WEEK_DATES.forEach(date => {
+  weekDates.forEach(date => {
     if (isFirstOfMonth(date)) {
       const lieadEmp = employees.find(e => e.name === "ליעד" && e.role === "רוקח");
       const dayShifts = DAY_SHIFTS[date.getDay()] || [];
@@ -173,7 +200,7 @@ function autoAssign(employees, availability, fridayRota, assigned) {
   // 3. Auto-assign pharmacists (skip Friday open/close which is done by rota)
   const pharmacists = employees.filter(e => e.role === "רוקח" && e.name !== "עדי");
 
-  WEEK_DATES.forEach(date => {
+  weekDates.forEach(date => {
     const dow = date.getDay();
     const dayShifts = DAY_SHIFTS[dow] || [];
     dayShifts.forEach(shift => {
@@ -220,7 +247,7 @@ function autoAssign(employees, availability, fridayRota, assigned) {
 
   // 4. Auto-assign פרח
   const parchs = employees.filter(e => e.role === "פרח");
-  WEEK_DATES.forEach(date => {
+  weekDates.forEach(date => {
     const dow = date.getDay();
     const dayShifts = DAY_SHIFTS[dow] || [];
     dayShifts.forEach(shift => {
@@ -280,6 +307,9 @@ export default function App() {
   const [empNoteInput, setEmpNoteInput] = useState("");
   const [showAutoConfirm, setShowAutoConfirm] = useState(false);
   const [sendMode, setSendMode] = useState("personal");
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = default scheduling week
+  const [vacations, setVacations] = useState({});
+  const weekDates = getWeekDates(weekOffset, published); // empId -> [{start, end, type, status, note}]
   const [dayRemarks, setDayRemarks] = useState({}); // dateKey -> ["הורדת מבצע", ...]
   const [shiftNotes, setShiftNotes] = useState({}); // dateKey_shiftId -> string
   const [changePwModal, setChangePwModal] = useState(null); // null | "manager" | empId
@@ -326,12 +356,13 @@ export default function App() {
       if (d.published)    setPublished(d.published);
       if (d.dayRemarks)   setDayRemarks(d.dayRemarks);
       if (d.shiftNotes)   setShiftNotes(d.shiftNotes);
+      if (d.vacations)    setVacations(d.vacations);
     });
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    saveData({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes });
+    saveData({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations });
   }, [employees, availability, assigned, notes, empNotes, fridayRota, published]);
 
   function showToast(msg, type="ok") { setToast({msg,type}); setTimeout(()=>setToast(null),3000); }
@@ -386,6 +417,28 @@ export default function App() {
     setDayRemarks(prev => ({ ...prev, [k]: next }));
   }
   function getRemarks(date) { return dayRemarks[dateKey(date)] || []; }
+
+  // ── VACATION HELPERS ──
+  function addVacationRequest(empId, startDate, endDate, type, note) {
+    const req = { id: Date.now(), start: startDate, end: endDate, type, note, status: "pending" };
+    setVacations(prev => ({ ...prev, [empId]: [...(prev[empId]||[]), req] }));
+    showToast("בקשת חופשה נשלחה ✓");
+  }
+  function approveVacation(empId, vacId) {
+    setVacations(prev => ({ ...prev, [empId]: (prev[empId]||[]).map(v => v.id===vacId?{...v,status:"approved"}:v) }));
+    showToast("חופשה אושרה ✓");
+  }
+  function rejectVacation(empId, vacId) {
+    setVacations(prev => ({ ...prev, [empId]: (prev[empId]||[]).map(v => v.id===vacId?{...v,status:"rejected"}:v) }));
+    showToast("חופשה נדחתה", "err");
+  }
+  function isOnVacation(empId, date) {
+    const key = dateKey(date);
+    return (vacations[empId]||[]).some(v => v.status==="approved" && key >= v.start && key <= v.end);
+  }
+  const pendingVacations = Object.entries(vacations).flatMap(([empId,reqs])=>
+    reqs.filter(r=>r.status==="pending").map(r=>({...r, empId: Number(empId)}))
+  );
 
   function snKey(date, shiftId) { return `${dateKey(date)}_${shiftId}`; }
   function getShiftNote(date, shiftId) { return shiftNotes[snKey(date,shiftId)] || ""; }
@@ -469,7 +522,7 @@ export default function App() {
   // ── STATS ──
   function getEmpStats(empId) {
     let morning=0, evening=0;
-    WEEK_DATES.forEach(date=>{
+    weekDates.forEach(date=>{
       (DAY_SHIFTS[date.getDay()]||[]).forEach(sh=>{
         ROLES.forEach(role=>{
           if(getAssigned(date,sh.id,role).includes(empId)){
@@ -485,7 +538,7 @@ export default function App() {
   // ── MISSING SLOTS ──
   function getMissingSlots() {
     const missing = [];
-    WEEK_DATES.forEach(date=>{
+    weekDates.forEach(date=>{
       (DAY_SHIFTS[date.getDay()]||[]).forEach(sh=>{
         ROLES.forEach(role=>{
           const needed = sh.slots[role]||0;
@@ -499,8 +552,8 @@ export default function App() {
 
   // ── WHATSAPP ──
   function buildScheduleText() {
-    let t = `📋 ${APP_NAME}\nשבוע ${formatDateShort(WEEK_DATES[0])}–${formatDateShort(WEEK_DATES[6])}\n\n`;
-    WEEK_DATES.forEach(date=>{
+    let t = `📋 ${APP_NAME}\nשבוע ${formatDateShort(weekDates[0])}–${formatDateShort(weekDates[6])}\n\n`;
+    weekDates.forEach(date=>{
       let block=`📅 ${formatDate(date)}\n`; let any=false;
       (DAY_SHIFTS[date.getDay()]||[]).forEach(sh=>{
         const parts=[];
@@ -522,13 +575,13 @@ export default function App() {
   }
 
   function buildReminderText() {
-    return `💊 ${APP_NAME}\nתזכורת: נא להשתבץ לשבוע ${formatDateShort(WEEK_DATES[0])}–${formatDateShort(WEEK_DATES[6])} עד יום שלישי 12:00\nפתח/י את האפליקציה ורשום/י זמינות.`;
+    return `💊 ${APP_NAME}\nתזכורת: נא להשתבץ לשבוע ${formatDateShort(weekDates[0])}–${formatDateShort(weekDates[6])} עד יום שלישי 12:00\nפתח/י את האפליקציה ורשום/י זמינות.`;
   }
 
   function buildPersonalText(emp) {
-    let t = `💊 ${APP_NAME}\nשלום ${emp.name}! הסידור שלך לשבוע ${formatDateShort(WEEK_DATES[0])}–${formatDateShort(WEEK_DATES[6])}:\n\n`;
+    let t = `💊 ${APP_NAME}\nשלום ${emp.name}! הסידור שלך לשבוע ${formatDateShort(weekDates[0])}–${formatDateShort(weekDates[6])}:\n\n`;
     let any = false;
-    WEEK_DATES.forEach(date=>{
+    weekDates.forEach(date=>{
       let dayLine = "";
       (DAY_SHIFTS[date.getDay()]||[]).forEach(sh=>{
         ROLES.forEach(role=>{
@@ -563,7 +616,7 @@ export default function App() {
   // ── WHO HASN'T SUBMITTED ──
   function notSubmitted() {
     return employees.filter(emp=>{
-      const total = WEEK_DATES.reduce((acc,date)=>{
+      const total = weekDates.reduce((acc,date)=>{
         return acc + (DAY_SHIFTS[date.getDay()]||[]).filter(sh=>(sh.slots[emp.role]||0)>0 && isAv(emp.id,date,sh.id)).length;
       },0);
       return total===0;
@@ -598,7 +651,7 @@ export default function App() {
         <div style={{textAlign:"center",padding:"24px 0 14px"}}>
           <div style={{fontSize:46,marginBottom:6}}>💊</div>
           <div style={{fontSize:20,fontWeight:"800"}}>{APP_NAME}</div>
-          <div style={{color:"#94a3b8",fontSize:12,marginTop:3}}>שבוע {formatDateShort(WEEK_DATES[0])} – {formatDateShort(WEEK_DATES[6])}</div>
+          <div style={{color:"#94a3b8",fontSize:12,marginTop:3}}>שבוע {formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}</div>
           {isPastDeadline() && <div style={{background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:"8px",padding:"6px 12px",fontSize:12,color:"#dc2626",marginTop:8,fontWeight:"700"}}>⏰ השיבוץ נעול — עבר יום שלישי 12:00</div>}
         </div>
         <div style={S.card}>
@@ -683,8 +736,8 @@ export default function App() {
   if (view==="employee") {
     const myRole = currentUser.role;
     const locked = isPastDeadline();
-    const relevantDays = WEEK_DATES.filter(date=>(DAY_SHIFTS[date.getDay()]||[]).some(sh=>(sh.slots[myRole]||0)>0));
-    const totalSel = WEEK_DATES.reduce((acc,date)=>(DAY_SHIFTS[date.getDay()]||[]).filter(sh=>(sh.slots[myRole]||0)>0&&isAv(currentUser.id,date,sh.id)).length+acc,0);
+    const relevantDays = weekDates.filter(date=>(DAY_SHIFTS[date.getDay()]||[]).some(sh=>(sh.slots[myRole]||0)>0));
+    const totalSel = weekDates.reduce((acc,date)=>(DAY_SHIFTS[date.getDay()]||[]).filter(sh=>(sh.slots[myRole]||0)>0&&isAv(currentUser.id,date,sh.id)).length+acc,0);
     return (
       <div style={S.app}>
         <div style={S.header}>
@@ -698,7 +751,7 @@ export default function App() {
         </div>
         <div style={S.main}>
           <div style={{marginBottom:12}}>
-            <div style={{fontWeight:"800",fontSize:16}}>📅 שבוע {formatDateShort(WEEK_DATES[0])} – {formatDateShort(WEEK_DATES[6])}</div>
+            <div style={{fontWeight:"800",fontSize:16}}>📅 שבוע {formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}</div>
             <div style={{color:"#64748b",fontSize:12,marginTop:3}}>
               {locked
                 ? <span style={{color:"#ef4444",fontWeight:"700"}}>⏰ נעול — עבר יום שלישי 12:00</span>
@@ -709,7 +762,7 @@ export default function App() {
           {/* Published schedule */}
           {published && (()=>{
             const mySlots=[];
-            WEEK_DATES.forEach(date=>{(DAY_SHIFTS[date.getDay()]||[]).forEach(sh=>{if(getAssigned(date,sh.id,myRole).includes(currentUser.id)) mySlots.push({date,sh});});});
+            weekDates.forEach(date=>{(DAY_SHIFTS[date.getDay()]||[]).forEach(sh=>{if(getAssigned(date,sh.id,myRole).includes(currentUser.id)) mySlots.push({date,sh});});});
             return (
               <div style={{...S.card,background:"#f0fdf4",border:"1px solid #86efac",marginBottom:12}}>
                 <div style={{fontWeight:"800",color:"#15803d",marginBottom:6}}>✅ המשמרות שלך השבוע</div>
@@ -724,21 +777,80 @@ export default function App() {
           })()}
 
           {/* Availability selection */}
-          {relevantDays.map(date=>(
-            <div key={dateKey(date)} style={S.card}>
-              <div style={{fontWeight:"800",fontSize:13,marginBottom:8}}>{formatDate(date)}</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-                {(DAY_SHIFTS[date.getDay()]||[]).filter(sh=>(sh.slots[myRole]||0)>0).map(sh=>{
-                  const active=isAv(currentUser.id,date,sh.id);
-                  return (
-                    <button key={sh.id} style={S.chip(active)} onClick={()=>!locked&&toggleAv(date,sh.id)} disabled={locked&&!active}>
-                      {active?"✓ ":""}{sh.label} <span style={{fontSize:10,opacity:0.7,fontWeight:"400"}}>{sh.time}</span>
-                    </button>
-                  );
-                })}
+          {relevantDays.map(date=>{
+            const onVac = isOnVacation(currentUser.id, date);
+            return (
+              <div key={dateKey(date)} style={S.card}>
+                <div style={{fontWeight:"800",fontSize:13,marginBottom:8}}>{formatDate(date)}</div>
+                {onVac ? (
+                  <div style={{background:"#d1fae5",border:"1px solid #6ee7b7",borderRadius:"10px",padding:"12px",textAlign:"center",color:"#065f46",fontWeight:"700",fontSize:14}}>
+                    🌴 חופשה נעימה! 😊
+                  </div>
+                ) : (
+                  <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                    {(DAY_SHIFTS[date.getDay()]||[]).filter(sh=>(sh.slots[myRole]||0)>0).map(sh=>{
+                      const active=isAv(currentUser.id,date,sh.id);
+                      return (
+                        <button key={sh.id} style={S.chip(active)} onClick={()=>!locked&&toggleAv(date,sh.id)} disabled={locked&&!active}>
+                          {active?"✓ ":""}{sh.label} <span style={{fontSize:10,opacity:0.7,fontWeight:"400"}}>{sh.time}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
+
+          {/* Vacation request */}
+          {(()=>{
+            const [vacType, setVacType] = React.useState("יום בודד");
+            const [vacStart, setVacStart] = React.useState("");
+            const [vacEnd, setVacEnd] = React.useState("");
+            const [vacNote, setVacNote] = React.useState("");
+            const myVacations = vacations[currentUser.id] || [];
+            return (
+              <div style={S.card}>
+                <div style={S.sTitle}>🌴 בקשת חופשה</div>
+                {myVacations.length>0 && (
+                  <div style={{marginBottom:12}}>
+                    {myVacations.map(v=>(
+                      <div key={v.id} style={{fontSize:12,display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderBottom:"1px solid #f1f5f9"}}>
+                        <span>{v.type==="יום בודד"?v.start:`${v.start} – ${v.end}`} ({v.type})</span>
+                        <span style={{fontWeight:"700",color:v.status==="approved"?"#22c55e":v.status==="rejected"?"#ef4444":"#f59e0b"}}>
+                          {v.status==="approved"?"✓ אושר":v.status==="rejected"?"✗ נדחה":"⏳ ממתין"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{display:"flex",gap:6,marginBottom:8}}>
+                  {["יום בודד","טווח תאריכים"].map(t=>(
+                    <button key={t} style={{...S.chip(vacType===t),flex:1,textAlign:"center"}} onClick={()=>setVacType(t)}>{t}</button>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:120}}>
+                    <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>{vacType==="יום בודד"?"תאריך":"מתאריך"}</div>
+                    <input type="date" style={{...S.input,width:"100%",boxSizing:"border-box"}} value={vacStart} onChange={e=>setVacStart(e.target.value)} />
+                  </div>
+                  {vacType==="טווח תאריכים" && (
+                    <div style={{flex:1,minWidth:120}}>
+                      <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>עד תאריך</div>
+                      <input type="date" style={{...S.input,width:"100%",boxSizing:"border-box"}} value={vacEnd} onChange={e=>setVacEnd(e.target.value)} />
+                    </div>
+                  )}
+                </div>
+                <input style={{...S.input,width:"100%",marginBottom:8,boxSizing:"border-box"}} placeholder="הערה (אופציונלי)" value={vacNote} onChange={e=>setVacNote(e.target.value)} />
+                <button style={{...S.btn("#0ea5e9"),width:"100%"}} onClick={()=>{
+                  if(!vacStart){showToast("נא לבחור תאריך","err");return;}
+                  const end = vacType==="יום בודד"?vacStart:vacEnd||vacStart;
+                  addVacationRequest(currentUser.id,vacStart,end,vacType,vacNote);
+                  setVacStart("");setVacEnd("");setVacNote("");
+                }}>שלח בקשת חופשה</button>
+              </div>
+            );
+          })()}
 
           {/* Note to manager */}
           <div style={S.card}>
@@ -747,10 +859,55 @@ export default function App() {
             <button style={S.btn()} onClick={saveEmpNote}>שמור הערה</button>
           </div>
 
+          {/* Feedback */}
+          <div style={S.card}>
+            <div style={S.sTitle}>💡 רעיונות ומשוב על האפליקציה</div>
+            <div style={{fontSize:12,color:"#64748b",marginBottom:8}}>מה דעתך? יש רעיון לשיפור? נשמח לשמוע!</div>
+            <textarea
+              style={{...S.input,width:"100%",minHeight:80,resize:"vertical",marginBottom:8}}
+              placeholder="כתוב/י כאן את המשוב שלך..."
+              id="emp-feedback-input"
+              defaultValue={empNotes[`feedback_${currentUser.id}`]||""}
+            />
+            <button style={S.btn("#7e22ce")} onClick={()=>{
+              const val = document.getElementById("emp-feedback-input").value.trim();
+              if(!val) return;
+              setEmpNotes(prev=>({...prev,[`feedback_${currentUser.id}`]:val}));
+              showToast("משוב נשלח, תודה! 💜");
+            }}>שלח משוב</button>
+          </div>
+
+          {/* Phone number update */}
+          <div style={S.card}>
+            <div style={S.sTitle}>📱 מספר טלפון</div>
+            <div style={{fontSize:12,color:"#64748b",marginBottom:8}}>
+              {currentUser.phone ? `מספר נוכחי: ${currentUser.phone}` : "לא הוזן מספר טלפון עדיין"}
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <input
+                style={{...S.input,flex:1}}
+                type="tel"
+                placeholder="05XXXXXXXX"
+                maxLength={10}
+                defaultValue={currentUser.phone||""}
+                id="emp-phone-input"
+                onInput={e=>{e.target.value=e.target.value.replace(/[^0-9]/g,"");}}
+              />
+              <button style={S.btn()} onClick={()=>{
+                const val = document.getElementById("emp-phone-input").value.trim();
+                if(!/^05\d{8}$/.test(val)) { showToast("מספר לא תקין — נא להזין 05XXXXXXXX","err"); return; }
+                setEmployees(prev=>prev.map(e=>e.id===currentUser.id?{...e,phone:val}:e));
+                setCurrentUser(prev=>({...prev,phone:val}));
+                showToast("מספר טלפון עודכן ✓");
+              }}>שמור</button>
+            </div>
+            <div style={{fontSize:11,color:"#94a3b8",marginTop:5}}>פורמט: 05XXXXXXXX (10 ספרות, ללא מקפים)</div>
+          </div>
+
           {/* Calendar export — only shown when schedule is published */}
           {published && (()=>{
             const mySlots=[];
-            WEEK_DATES.forEach(date=>{
+            weekDates.forEach(date=>{
               (DAY_SHIFTS[date.getDay()]||[]).forEach(sh=>{
                 if(getAssigned(date,sh.id,myRole).includes(currentUser.id)) mySlots.push({date,sh});
               });
@@ -812,14 +969,23 @@ export default function App() {
 
   // ════════════ MANAGER ════════════
   const missing = getMissingSlots();
-  const tabs = [["simulation","📊 סימולציה"],["assign","✏️ שיבוץ"],["publish","📤 פרסום"],["notes","📝 הערות"],["settings","⚙️ הגדרות"]];
+  const tabs = [["simulation","📊 סימולציה"],["assign","✏️ שיבוץ"],["publish","📤 פרסום"],["notes","📝 הערות"],["feedback","💡 משוב"],["vacations","🌴 חופשות"],["settings","⚙️ הגדרות"]];
 
   return (
     <div style={S.app}>
       <div style={S.header}>
         <div style={S.logo}>{APP_NAME} — מנהל/ת</div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          {/* Week navigation */}
+          <div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.1)",borderRadius:"8px",padding:"3px 8px"}}>
+            <button style={{background:"none",border:"none",color:"#f8fafc",cursor:"pointer",fontSize:16,padding:"0 4px"}} onClick={()=>setWeekOffset(w=>w-1)}>◀</button>
+            <span style={{fontSize:11,color:"#94a3b8",minWidth:90,textAlign:"center"}}>
+              {weekOffset===0?"שבוע נוכחי":weekOffset===1?"שבוע הבא":`+${weekOffset} שבועות`}
+            </span>
+            <button style={{background:"none",border:"none",color:"#f8fafc",cursor:"pointer",fontSize:16,padding:"0 4px"}} onClick={()=>setWeekOffset(w=>w+1)}>▶</button>
+          </div>
           {missing.length>0 && <span style={{background:"#ef4444",color:"#fff",borderRadius:"20px",padding:"2px 10px",fontSize:12,fontWeight:"700"}}>⚠️ {missing.length} חסרים</span>}
+          {pendingVacations.length>0 && <span style={{background:"#f59e0b",color:"#000",borderRadius:"20px",padding:"2px 10px",fontSize:12,fontWeight:"700"}}>🌴 {pendingVacations.length} חופשות</span>}
           <button style={S.btnSm("#0ea5e9")} onClick={()=>window.location.reload()}>🔄</button>
           <button style={S.btnSm("#475569")} onClick={openChangePw}>🔑 סיסמה</button>
           <button style={S.btnSm()} onClick={logout}>יציאה</button>
@@ -837,6 +1003,37 @@ export default function App() {
         {/* ── SIMULATION TAB ── */}
         {managerTab==="simulation" && (
           <div>
+            {/* Vacation alerts — employees currently on vacation */}
+            {(() => {
+              const today = new Date();
+              const todayKey = dateKey(today);
+              const onVacNow = employees.filter(emp =>
+                (vacations[emp.id]||[]).some(v => v.status==="approved" && todayKey >= v.start && todayKey <= v.end)
+              );
+              const returning = employees.filter(emp =>
+                (vacations[emp.id]||[]).some(v => {
+                  if(v.status!=="approved") return false;
+                  const returnDate = new Date(v.end);
+                  returnDate.setDate(returnDate.getDate()+1);
+                  return returnDate > today && new Date(v.end) >= today;
+                })
+              );
+              if(!returning.length) return null;
+              return (
+                <div style={{...S.card, background:"#f0fdf4", border:"1px solid #86efac", marginBottom:14}}>
+                  <div style={{fontWeight:"800",color:"#15803d",marginBottom:8}}>🌴 עובדים בחופשה</div>
+                  {returning.map(emp=>{
+                    const vac = (vacations[emp.id]||[]).find(v=>v.status==="approved"&&todayKey<=v.end);
+                    return (
+                      <div key={emp.id} style={{fontSize:13,color:"#166534",marginBottom:4,display:"flex",justifyContent:"space-between"}}>
+                        <span><strong>{emp.name}</strong> בחופשה עד {vac?.end}</span>
+                        <span style={{fontSize:11,color:"#15803d"}}>חוזר/ת {new Date(vac?.end).toLocaleDateString("he-IL",{day:"numeric",month:"numeric"})}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             {/* Missing alerts */}
             {missing.length>0 && (
               <div style={S.alertCard}>
@@ -855,7 +1052,7 @@ export default function App() {
                 <thead>
                   <tr style={{background:"#1e293b",color:"#f8fafc"}}>
                     <th style={{padding:"10px 8px",textAlign:"right",fontWeight:"700",minWidth:80}}>משמרת</th>
-                    {WEEK_DATES.map(date=>(
+                    {weekDates.map(date=>(
                       <th key={dateKey(date)} style={{padding:"10px 8px",textAlign:"center",fontWeight:"700",minWidth:90}}>
                         <div>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
                         <div style={{fontSize:10,opacity:0.7}}>{formatDateShort(date)}</div>
@@ -883,7 +1080,7 @@ export default function App() {
                             <td style={{padding:"8px",fontWeight:"700",color:ROLE_COLORS[role]?.dark,whiteSpace:"nowrap"}}>
                               {group.label}&nbsp;<span style={S.badge(role)}>{role}</span>
                             </td>
-                            {WEEK_DATES.map(date=>{
+                            {weekDates.map(date=>{
                               const dayShifts = DAY_SHIFTS[date.getDay()] || [];
                               // Find the shift for this day that belongs to this row group
                               const shift = dayShifts.find(s => group.matchIds.includes(s.id));
@@ -909,6 +1106,10 @@ export default function App() {
                                   ))}
                                   {names.length===0 && <div style={{color:"#ef4444",fontSize:10,fontWeight:"700"}}>—</div>}
                                   {getShiftNote(date,shift.id) && <div style={{fontSize:9,color:"#92400e",marginTop:2,background:"#fef3c7",borderRadius:4,padding:"1px 4px"}}>💬 {getShiftNote(date,shift.id)}</div>}
+                                  {/* Show vacations */}
+                                  {employees.filter(e=>e.role===role&&isOnVacation(e.id,date)).map(e=>(
+                                    <div key={e.id} style={{fontSize:9,color:"#065f46",background:"#d1fae5",borderRadius:4,padding:"1px 4px",marginTop:1}}>🌴 {e.name}</div>
+                                  ))}
                                 </td>
                               );
                             })}
@@ -982,7 +1183,7 @@ export default function App() {
               </div>
             )}
 
-            {WEEK_DATES.map(date=>{
+            {weekDates.map(date=>{
               const dayShifts=DAY_SHIFTS[date.getDay()]||[];
               return (
                 <div key={dateKey(date)} style={S.card}>
@@ -1146,29 +1347,145 @@ export default function App() {
           </div>
         )}
 
-        {/* ── SETTINGS TAB ── */}
-        {managerTab==="settings" && (
+        {/* ── FEEDBACK TAB ── */}
+        {managerTab==="feedback" && (
           <div>
-            {/* Friday rota upload */}
-            <div style={S.card}>
-              <div style={S.sTitle}>📅 תורנויות שישי (CSV)</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:10}}>
-                פורמט: תאריך, שם רוקח, פתיחה/סגירה<br/>
-                דוגמה: 06/06/2025,סמר,פתיחה
-              </div>
-              {fridayRota.length>0 && (
-                <div style={{marginBottom:10}}>
-                  {fridayRota.map((r,i)=>(
-                    <div key={i} style={{fontSize:12,color:"#334155",padding:"3px 0",borderBottom:"1px solid #f1f5f9"}}>
-                      {r.date} — {r.name} — {r.shift}
+            <div style={{color:"#64748b",fontSize:13,marginBottom:14}}>משובים שהתקבלו מהעובדים:</div>
+            {employees.map(emp=>{
+              const feedback = empNotes[`feedback_${emp.id}`];
+              if(!feedback) return null;
+              return (
+                <div key={emp.id} style={{...S.card,borderRight:`4px solid #7e22ce`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                    <span style={{fontWeight:"800"}}>{emp.name}</span>
+                    <span style={S.badge(emp.role)}>{emp.role}</span>
+                  </div>
+                  <div style={{fontSize:13,color:"#334155",background:"#f5f3ff",borderRadius:"8px",padding:"8px 12px"}}>{feedback}</div>
+                  <button style={{...S.btnSm("#ef4444"),marginTop:8}} onClick={()=>{
+                    if(window.confirm("למחוק משוב זה?")) {
+                      setEmpNotes(prev=>{const n={...prev};delete n[`feedback_${emp.id}`];return n;});
+                      showToast("משוב נמחק");
+                    }
+                  }}>מחק</button>
+                </div>
+              );
+            })}
+            {employees.every(emp=>!empNotes[`feedback_${emp.id}`]) && (
+              <div style={{textAlign:"center",color:"#94a3b8",padding:40}}>אין משובים עדיין</div>
+            )}
+          </div>
+        )}
+
+        {/* ── VACATIONS TAB ── */}
+        {managerTab==="vacations" && (
+          <div>
+            {/* Pending requests */}
+            <div style={{fontWeight:"800",fontSize:14,marginBottom:10}}>⏳ בקשות ממתינות ({pendingVacations.length})</div>
+            {pendingVacations.length===0 && <div style={{...S.card,color:"#94a3b8",textAlign:"center",padding:30}}>אין בקשות ממתינות</div>}
+            {pendingVacations.map(req=>{
+              const emp = employees.find(e=>e.id===req.empId);
+              return (
+                <div key={req.id} style={{...S.card,borderRight:"4px solid #f59e0b"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                    <div>
+                      <span style={{fontWeight:"800"}}>{emp?.name}</span>
+                      <span style={{...S.badge(emp?.role||"רוקח"),marginRight:8}}>{emp?.role}</span>
+                    </div>
+                    <span style={{fontSize:11,background:req.type==="יום בודד"?"#e0f2fe":"#f3e8ff",color:req.type==="יום בודד"?"#0369a1":"#7e22ce",padding:"2px 8px",borderRadius:"20px",fontWeight:"700"}}>{req.type}</span>
+                  </div>
+                  <div style={{fontSize:13,color:"#475569",marginBottom:4}}>
+                    {req.type==="יום בודד" ? `📅 ${req.start}` : `📅 ${req.start} עד ${req.end}`}
+                  </div>
+                  {req.note && <div style={{fontSize:12,color:"#64748b",background:"#f8fafc",borderRadius:"6px",padding:"4px 8px",marginBottom:8}}>💬 {req.note}</div>}
+                  <div style={{display:"flex",gap:8}}>
+                    <button style={S.btnSm("#22c55e")} onClick={()=>approveVacation(req.empId,req.id)}>✓ אשר</button>
+                    <button style={S.btnSm("#ef4444")} onClick={()=>rejectVacation(req.empId,req.id)}>✗ דחה</button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Approved vacations */}
+            <div style={{fontWeight:"800",fontSize:14,margin:"16px 0 10px"}}>✅ חופשות מאושרות</div>
+            {employees.map(emp=>{
+              const approved = (vacations[emp.id]||[]).filter(v=>v.status==="approved");
+              if(!approved.length) return null;
+              return (
+                <div key={emp.id} style={S.card}>
+                  <div style={{fontWeight:"700",marginBottom:6}}>{emp.name} <span style={S.badge(emp.role)}>{emp.role}</span></div>
+                  {approved.map(v=>(
+                    <div key={v.id} style={{fontSize:13,color:"#166534",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0",borderBottom:"1px solid #f0fdf4"}}>
+                      <span>{v.type==="יום בודד"?v.start:`${v.start} – ${v.end}`} ({v.type})</span>
+                      <button style={S.btnSm("#ef4444")} onClick={()=>setVacations(prev=>({...prev,[emp.id]:(prev[emp.id]||[]).filter(x=>x.id!==v.id)}))}>✕</button>
                     </div>
                   ))}
                 </div>
-              )}
-              <input ref={fileRef} type="file" accept=".csv" style={{display:"none"}} onChange={handleCSV} />
-              <button style={S.btn("#0ea5e9")} onClick={()=>fileRef.current?.click()}>📂 העלה קובץ CSV</button>
-              {fridayRota.length>0 && <button style={{...S.btn("#ef4444"),marginRight:8}} onClick={()=>setFridayRota([])}>נקה</button>}
-            </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── SETTINGS TAB ── */}
+        {managerTab==="settings" && (
+          <div>
+            {/* Friday rota - manual entry */}
+            {(()=>{
+              const [newRotaDate, setNewRotaDate] = React.useState("");
+              const [newRotaOpen, setNewRotaOpen] = React.useState("");
+              const [newRotaClose, setNewRotaClose] = React.useState("");
+              const pharmacists = employees.filter(e=>e.role==="רוקח");
+              return (
+                <div style={S.card}>
+                  <div style={S.sTitle}>📅 תורנויות שישי</div>
+                  {/* Existing entries */}
+                  {fridayRota.length>0 && (
+                    <div style={{marginBottom:12}}>
+                      {fridayRota.map((r,i)=>(
+                        <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #f1f5f9",fontSize:13}}>
+                          <span><strong>{r.date}</strong> — פתיחה: {r.open||"—"} | סגירה: {r.close||"—"}</span>
+                          <button style={S.btnSm("#ef4444")} onClick={()=>setFridayRota(prev=>prev.filter((_,j)=>j!==i))}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Add new entry */}
+                  <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                    <div style={{fontSize:12,color:"#64748b",fontWeight:"700"}}>הוסף תורנות שישי:</div>
+                    <input
+                      style={{...S.input,width:"100%",boxSizing:"border-box"}}
+                      type="date"
+                      value={newRotaDate}
+                      onChange={e=>setNewRotaDate(e.target.value)}
+                    />
+                    <div style={{display:"flex",gap:7}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>פתיחה (08:00-14:00)</div>
+                        <select style={{...S.input,width:"100%",boxSizing:"border-box"}} value={newRotaOpen} onChange={e=>setNewRotaOpen(e.target.value)}>
+                          <option value="">— בחר/י —</option>
+                          {pharmacists.map(emp=><option key={emp.id} value={emp.name}>{emp.name}</option>)}
+                        </select>
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>סגירה (14:00-20:00)</div>
+                        <select style={{...S.input,width:"100%",boxSizing:"border-box"}} value={newRotaClose} onChange={e=>setNewRotaClose(e.target.value)}>
+                          <option value="">— בחר/י —</option>
+                          {pharmacists.map(emp=><option key={emp.id} value={emp.name}>{emp.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <button style={{...S.btn(),width:"100%"}} onClick={()=>{
+                      if(!newRotaDate||(!newRotaOpen&&!newRotaClose)) return;
+                      const d = new Date(newRotaDate);
+                      const label = d.toLocaleDateString("he-IL",{day:"numeric",month:"numeric",year:"numeric"});
+                      setFridayRota(prev=>[...prev.filter(r=>r.date!==label), {date:label, open:newRotaOpen, close:newRotaClose}].sort((a,b)=>a.date.localeCompare(b.date)));
+                      setNewRotaDate(""); setNewRotaOpen(""); setNewRotaClose("");
+                      showToast("תורנות נוספה ✓");
+                    }}>+ הוסף תורנות</button>
+                    {fridayRota.length>0 && <button style={{...S.btn("#ef4444"),width:"100%"}} onClick={()=>{if(window.confirm("למחוק את כל התורנויות?")) setFridayRota([]);}}>מחק הכל</button>}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Employees */}
             <div style={S.card}>
@@ -1182,7 +1499,12 @@ export default function App() {
                       <div style={{display:"flex",gap:5,alignItems:"center"}}>
                         <input style={{...S.input,width:110,fontSize:12}} placeholder="טלפון" value={emp.phone||""} onChange={e=>setEmployees(prev=>prev.map(em=>em.id===emp.id?{...em,phone:e.target.value}:em))} />
                         {empPasswords[emp.id] && (
-                          <button style={S.btnSm("#f59e0b","#1e293b")} title="אפס סיסמה" onClick={()=>{if(window.confirm(`לאפס סיסמה של ${emp.name}?`)) setEmpPasswords(prev=>{const n={...prev};delete n[emp.id];return n;});}}>🔓</button>
+                          <button style={S.btnSm("#f59e0b","#1e293b")} title="אפס סיסמה" onClick={()=>{
+                            if(window.confirm(`לאפס סיסמה של ${emp.name}?`)) {
+                              setEmpPasswords(prev=>{const n={...prev};delete n[emp.id];return n;});
+                              showToast(`סיסמת ${emp.name} אופסה ✓`);
+                            }
+                          }}>🔓 אפס</button>
                         )}
                         <button style={S.btnSm("#ef4444")} onClick={()=>setEmployees(prev=>prev.filter(e=>e.id!==emp.id))}>✕</button>
                       </div>
@@ -1267,3 +1589,4 @@ export default function App() {
     );
   }
 }
+
