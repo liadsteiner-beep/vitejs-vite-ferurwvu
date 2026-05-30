@@ -985,7 +985,17 @@ export default function App() {
           </div>
           {missing.length>0 && <span style={{background:"#ef4444",color:"#fff",borderRadius:"20px",padding:"2px 10px",fontSize:12,fontWeight:"700"}}>⚠️ {missing.length} חסרים</span>}
           {pendingVacations.length>0 && <span style={{background:"#f59e0b",color:"#000",borderRadius:"20px",padding:"2px 10px",fontSize:12,fontWeight:"700"}}>🌴 {pendingVacations.length} חופשות</span>}
-          <button style={S.btnSm("#0ea5e9")} onClick={()=>showToast("הנתונים מתעדכנים בזמן אמת ✓")}>🔄</button>
+          <button style={S.btnSm("#0ea5e9")} onClick={()=>{
+            getDoc(doc(db,"pharmacy","schedule")).then(snap=>{
+              if(!snap.exists()) return;
+              const d=snap.data();
+              if(d.availability) setAvailability(d.availability);
+              if(d.assigned) setAssigned(d.assigned);
+              if(d.empNotes) setEmpNotes(d.empNotes);
+              if(d.vacations) setVacations(d.vacations);
+              showToast("נתונים עודכנו ✓");
+            });
+          }}>🔄</button>
           <button style={S.btnSm("#475569")} onClick={openChangePw}>🔑 סיסמה</button>
           <button style={S.btnSm()} onClick={logout}>יציאה</button>
         </div>
