@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 
 // ─── FIREBASE ─────────────────────────────────────────────────────────────────
 const firebaseApp = initializeApp({
@@ -346,8 +346,8 @@ export default function App() {
       if (local.dayRemarks)   setDayRemarks(local.dayRemarks);
       if (local.shiftNotes)   setShiftNotes(local.shiftNotes);
     }
-    // Then subscribe to Firebase for real-time updates
-    const unsub = onSnapshot(doc(db, "pharmacy", "schedule"), (snap) => {
+    // Load from Firebase once on mount
+    getDoc(doc(db, "pharmacy", "schedule")).then((snap) => {
       if (!snap.exists()) return;
       const d = snap.data();
       if (d.employees) {
@@ -366,7 +366,7 @@ export default function App() {
       if (d.shiftNotes)   setShiftNotes(d.shiftNotes);
       if (d.vacations)    setVacations(d.vacations);
     });
-    return () => unsub();
+    return () => {};
   }, []);
 
   useEffect(() => {
