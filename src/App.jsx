@@ -429,15 +429,21 @@ export default function App() {
   // ── VACATION HELPERS ──
   function addVacationRequest(empId, startDate, endDate, type, note) {
     const req = { id: Date.now(), start: startDate, end: endDate, type, note, status: "pending" };
-    setVacations(prev => ({ ...prev, [empId]: [...(prev[empId]||[]), req] }));
+    const updated = { ...vacations, [empId]: [...(vacations[empId]||[]), req] };
+    setVacations(updated);
+    fbSave({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations: updated });
     showToast("בקשת חופשה נשלחה ✓");
   }
   function approveVacation(empId, vacId) {
-    setVacations(prev => ({ ...prev, [empId]: (prev[empId]||[]).map(v => v.id===vacId?{...v,status:"approved"}:v) }));
+    const updated = { ...vacations, [empId]: (vacations[empId]||[]).map(v => v.id===vacId?{...v,status:"approved"}:v) };
+    setVacations(updated);
+    fbSave({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations: updated });
     showToast("חופשה אושרה ✓");
   }
   function rejectVacation(empId, vacId) {
-    setVacations(prev => ({ ...prev, [empId]: (prev[empId]||[]).map(v => v.id===vacId?{...v,status:"rejected"}:v) }));
+    const updated = { ...vacations, [empId]: (vacations[empId]||[]).map(v => v.id===vacId?{...v,status:"rejected"}:v) };
+    setVacations(updated);
+    fbSave({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations: updated });
     showToast("חופשה נדחתה", "err");
   }
   function isOnVacation(empId, date) {
@@ -832,13 +838,37 @@ export default function App() {
             </div>
             <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
               <div style={{flex:1,minWidth:120}}>
-                <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>{vacType==="יום בודד"?"תאריך":"מתאריך"}</div>
-                <input type="date" style={{...S.input,width:"100%",boxSizing:"border-box"}} value={vacStart} onChange={e=>setVacStart(e.target.value)} />
+                <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>{vacType==="יום בודד"?"תאריך":"מתאריך"} (DD/MM/YY)</div>
+                <input
+                  type="text"
+                  placeholder="01/06/25"
+                  maxLength={8}
+                  style={{...S.input,width:"100%",boxSizing:"border-box"}}
+                  value={vacStart}
+                  onChange={e=>{
+                    let v=e.target.value.replace(/[^0-9/]/g,"");
+                    if(v.length===2&&!v.includes("/")) v=v+"/";
+                    if(v.length===5&&v.split("/").length===2) v=v+"/";
+                    setVacStart(v);
+                  }}
+                />
               </div>
               {vacType==="טווח תאריכים" && (
                 <div style={{flex:1,minWidth:120}}>
-                  <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>עד תאריך</div>
-                  <input type="date" style={{...S.input,width:"100%",boxSizing:"border-box"}} value={vacEnd} onChange={e=>setVacEnd(e.target.value)} />
+                  <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>עד תאריך (DD/MM/YY)</div>
+                  <input
+                    type="text"
+                    placeholder="07/06/25"
+                    maxLength={8}
+                    style={{...S.input,width:"100%",boxSizing:"border-box"}}
+                    value={vacEnd}
+                    onChange={e=>{
+                      let v=e.target.value.replace(/[^0-9/]/g,"");
+                      if(v.length===2&&!v.includes("/")) v=v+"/";
+                      if(v.length===5&&v.split("/").length===2) v=v+"/";
+                      setVacEnd(v);
+                    }}
+                  />
                 </div>
               )}
             </div>
