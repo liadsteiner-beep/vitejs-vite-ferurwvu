@@ -118,11 +118,12 @@ function isFirstOfMonth(d) { return d.getDate() === 1; }
 
 // Deadline: next Tuesday 12:00 of the scheduling week
 function getDeadline(offsetWeeks = 0) {
+  // Deadline = Tuesday 12:00 of the week BEFORE the scheduling week
   const dates = getWeekDates(offsetWeeks);
-  const tuesday = dates[2];
-  const dl = new Date(tuesday);
-  dl.setHours(12, 0, 0, 0);
-  return dl;
+  const tuesday = new Date(dates[2]); // Tuesday of the scheduling week
+  tuesday.setHours(12, 0, 0, 0);
+  tuesday.setDate(tuesday.getDate() - 7); // Tuesday of the PREVIOUS week
+  return tuesday;
 }
 
 function isPastDeadline(offsetWeeks = 0) { return new Date() > getDeadline(offsetWeeks); }
@@ -496,7 +497,7 @@ export default function App() {
   const isAv  = (empId,date,shiftId) => !!availability[avKey(empId,date,shiftId)];
 
   function toggleAv(date,shiftId) {
-    if (isPastDeadline() && !currentUser?.isManager) { showToast("השיבוץ נעול (עבר יום שלישי 12:00)","err"); return; }
+    if (isPastDeadline(weekOffset) && !currentUser?.isManager) { showToast("השיבוץ נעול (עבר יום שלישי 12:00)","err"); return; }
     const k = avKey(currentUser.id,date,shiftId);
     setAvailability(prev=>({...prev,[k]:!prev[k]}));
   }
@@ -772,7 +773,7 @@ export default function App() {
   // ════════════ EMPLOYEE ════════════
   if (view==="employee") {
     const myRole = currentUser.role;
-    const locked = isPastDeadline();
+    const locked = isPastDeadline(weekOffset);
     const relevantDays = weekDates.filter(date=>(DAY_SHIFTS[date.getDay()]||[]).some(sh=>(sh.slots[myRole]||0)>0));
     const totalSel = weekDates.reduce((acc,date)=>(DAY_SHIFTS[date.getDay()]||[]).filter(sh=>(sh.slots[myRole]||0)>0&&isAv(currentUser.id,date,sh.id)).length+acc,0);
     return (
@@ -788,11 +789,20 @@ export default function App() {
         </div>
         <div style={S.main}>
           <div style={{marginBottom:12}}>
-            <div style={{fontWeight:"800",fontSize:16}}>📅 שבוע {formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}</div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+              <div style={{fontWeight:"800",fontSize:16}}>📅 שבוע {formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}</div>
+              <div style={{display:"flex",alignItems:"center",gap:6,background:"#f1f5f9",borderRadius:"8px",padding:"3px 8px"}}>
+                <button style={{background:"none",border:"none",color:"#1e293b",cursor:"pointer",fontSize:16,padding:"0 4px"}} onClick={()=>setWeekOffset(w=>Math.max(0,w-1))}>◀</button>
+                <span style={{fontSize:11,color:"#64748b",minWidth:60,textAlign:"center"}}>
+                  {weekOffset===0?"הבא":weekOffset===1?"שבועיים":`+${weekOffset+1} שבועות`}
+                </span>
+                <button style={{background:"none",border:"none",color:"#1e293b",cursor:"pointer",fontSize:16,padding:"0 4px"}} onClick={()=>setWeekOffset(w=>w+1)}>▶</button>
+              </div>
+            </div>
             <div style={{color:"#64748b",fontSize:12,marginTop:3}}>
               {locked
-                ? <span style={{color:"#ef4444",fontWeight:"700"}}>⏰ נעול — עבר יום שלישי 12:00</span>
-                : <>סמן/י זמינות עד שלישי 12:00 • <span style={{color:"#0ea5e9",fontWeight:"700"}}>{totalSel} נבחרו</span></>}
+                ? <span style={{color:"#ef4444",fontWeight:"700"}}>⏰ שבוע זה נעול — עבר יום שלישי 12:00</span>
+                : <>סמן/י זמינות • <span style={{color:"#0ea5e9",fontWeight:"700"}}>{totalSel} נבחרו</span></>}
             </div>
           </div>
 
@@ -1089,11 +1099,16 @@ export default function App() {
                 <div style={{...S.card, background:"#f0fdf4", border:"1px solid #86efac", marginBottom:14}}>
                   <div style={{fontWeight:"800",color:"#15803d",marginBottom:8}}>🌴 עובדים בחופשה</div>
                   {returning.map(emp=>{
-                    const vac = (vacations[emp.id]||[]).find(v=>v.status==="approved"&&todayKey<=v.end);
+                    const vac = (vacations[emp.id]||[]).find(v=>{
+                      if(v.status!=="approved") return false;
+                      const end = parseDDMMYY(v.end) || v.end;
+                      return end >= todayKey;
+                    });
+                    if(!vac) return null;
                     return (
                       <div key={emp.id} style={{fontSize:13,color:"#166534",marginBottom:4,display:"flex",justifyContent:"space-between"}}>
-                        <span><strong>{emp.name}</strong> בחופשה עד {vac?.end}</span>
-                        <span style={{fontSize:11,color:"#15803d"}}>חוזר/ת {vac?.end}</span>
+                        <span><strong>{emp.name}</strong> בחופשה עד {vac.end}</span>
+                        <span style={{fontSize:11,color:"#15803d"}}>חוזר/ת {vac.end}</span>
                       </div>
                     );
                   })}
