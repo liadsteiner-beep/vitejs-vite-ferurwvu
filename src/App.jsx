@@ -454,7 +454,8 @@ export default function App() {
     const parts = str.split("/");
     if (parts.length !== 3) return null;
     const [dd, mm, yy] = parts;
-    return `20${yy}-${mm.padStart(2,"0")}-${dd.padStart(2,"0")}`;
+    const year = yy.length === 2 ? `20${yy}` : yy;
+    return `${year}-${mm.padStart(2,"0")}-${dd.padStart(2,"0")}`;
   }
   function isOnVacation(empId, date) {
     const key = dateKey(date);
@@ -871,11 +872,11 @@ export default function App() {
             </div>
             <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
               <div style={{flex:1,minWidth:120}}>
-                <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>{vacType==="יום בודד"?"תאריך":"מתאריך"} (DD/MM/YY)</div>
+                <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>{vacType==="יום בודד"?"תאריך":"מתאריך"} (DD/MM/YYYY)</div>
                 <input
                   type="text"
-                  placeholder="01/06/25"
-                  maxLength={8}
+                  placeholder="05/07/2026"
+                  maxLength={10}
                   style={{...S.input,width:"100%",boxSizing:"border-box"}}
                   value={vacStart}
                   onChange={e=>{
@@ -888,11 +889,11 @@ export default function App() {
               </div>
               {vacType==="טווח תאריכים" && (
                 <div style={{flex:1,minWidth:120}}>
-                  <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>עד תאריך (DD/MM/YY)</div>
+                  <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>עד תאריך (DD/MM/YYYY)</div>
                   <input
                     type="text"
-                    placeholder="07/06/25"
-                    maxLength={8}
+                    placeholder="08/07/2026"
+                    maxLength={10}
                     style={{...S.input,width:"100%",boxSizing:"border-box"}}
                     value={vacEnd}
                     onChange={e=>{
