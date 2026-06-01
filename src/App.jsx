@@ -351,13 +351,25 @@ export default function App() {
     }
     // Load once from Firebase (saves quota vs onSnapshot)
     getDoc(doc(db, "pharmacy", "schedule")).then((snap) => {
-      if (!snap.exists()) { setFbLoaded(true); return; }
+      const local = loadLocalData();
+      if (!snap.exists()) {
+        // No Firebase data — upload local data if exists
+        if (local) {
+          setFbLoaded(true);
+          // Will be saved when fbLoaded becomes true
+        } else {
+          setFbLoaded(true);
+        }
+        return;
+      }
       const d = snap.data();
       if (d.employees) {
         const hasOldNames = d.employees.some(e => ["פרח 1","פרח 2","פרח 3"].includes(e.name));
         if (!hasOldNames) setEmployees(d.employees);
       }
-      if (d.availability) setAvailability(d.availability);
+      // Merge availability: Firebase + local (local wins for same keys)
+      const mergedAv = { ...(d.availability||{}), ...(local?.availability||{}) };
+      setAvailability(mergedAv);
       if (d.assigned)     setAssigned(d.assigned);
       if (d.notes)        setNotes(d.notes);
       if (d.empNotes)     setEmpNotes(d.empNotes);
@@ -373,6 +385,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!fbLoaded) return; // Don't save before Firebase data is loaded
     saveData({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations });
   }, [employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations]);
 
@@ -1023,6 +1036,10 @@ export default function App() {
           })()}
 
           <div style={{textAlign:"center",color:"#94a3b8",fontSize:11,marginTop:4}}>נשמר אוטומטית</div>
+          <button style={{...S.btn("#22c55e"),width:"100%",marginTop:12,padding:14,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
+            onClick={()=>showToast("הזמינות נשלחה למנהלת ✓")}>
+            ✅ שלח
+          </button>
         </div>
         {changePwModal && <ChangePwModal />}
         {toast && <div style={S.toast(toast.type)}>{toast.msg}</div>}
@@ -1314,13 +1331,24 @@ export default function App() {
                               <span style={{background:filled>=needed?"#dcfce7":"#fef3c7",color:filled>=needed?"#15803d":"#92400e",borderRadius:"20px",padding:"1px 7px",fontSize:10,fontWeight:"700"}}>{filled}/{needed}</span>
                             </div>
                             <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                              {allShown.map(empId=>{
-                                const emp=employees.find(e=>e.id===empId);
-                                if(!emp) return null;
-                                const isAss=assignedIds.includes(empId);
-                                return <button key={empId} style={S.empChip(isAss)} onClick={()=>toggleAssign(date,shift.id,role,empId)}>{isAss?"✓ ":"+ "}{emp.name}</button>;
+                              {/* Available employees */}
+                              {avail.map(emp=>{
+                                const isAss=assignedIds.includes(emp.id);
+                                return <button key={emp.id} style={S.empChip(isAss)} onClick={()=>toggleAssign(date,shift.id,role,emp.id)}>{isAss?"✓ ":"+ "}{emp.name}</button>;
                               })}
-                              {allShown.length===0&&<span style={{color:"#94a3b8",fontSize:11}}>אין פנויים</span>}
+                              {/* Non-available employees — grayed but clickable for manual assignment */}
+                              {employees.filter(e=>e.role===role&&!isAv(e.id,date,shift.id)&&!avail.find(a=>a.id===e.id)).map(emp=>{
+                                const isAss=assignedIds.includes(emp.id);
+                                return (
+                                  <button key={emp.id}
+                                    style={{...S.empChip(isAss), opacity: isAss?1:0.4, borderStyle: isAss?"solid":"dashed"}}
+                                    onClick={()=>toggleAssign(date,shift.id,role,emp.id)}
+                                    title="שיבוץ ידני">
+                                    {isAss?"✓ ":"+ "}{emp.name}
+                                  </button>
+                                );
+                              })}
+                              {employees.filter(e=>e.role===role).length===0&&<span style={{color:"#94a3b8",fontSize:11}}>אין עובדים</span>}
                             </div>
                           </div>
                         );
