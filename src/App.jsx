@@ -131,7 +131,7 @@ function isPastDeadline(offsetWeeks = 0) { return new Date() > getDeadline(offse
 const WEEK_DATES = getWeekDates(0); // default for auto-assign algorithm
 
 // ─── AUTO-ASSIGN ALGORITHM ───────────────────────────────────────────────────
-function autoAssign(employees, availability, fridayRota, assigned) {
+function autoAssign(employees, availability, fridayRota, assigned, weekDates) {
   const newAssigned = { ...assigned };
 
   // Helper: get assigned for a slot
@@ -301,7 +301,7 @@ export default function App() {
   const [fridayRota, setFridayRota]   = useState([]); // [{name, shift, date}]
   const [published, setPublished]     = useState(false);
   const [toast, setToast]             = useState(null);
-  const [managerTab, setManagerTab]   = useState("simulation");
+  const [managerTab, setManagerTab]   = useState("assign");
   const [newEmpName, setNewEmpName]   = useState("");
   const [newEmpRole, setNewEmpRole]   = useState("רוקח");
   const [newEmpPhone, setNewEmpPhone] = useState("");
@@ -528,7 +528,7 @@ export default function App() {
 
   // ── AUTO ASSIGN ──
   function runAutoAssign() {
-    const result = autoAssign(employees, availability, fridayRota, assigned);
+    const result = autoAssign(employees, availability, fridayRota, assigned, weekDates);
     setAssigned(result);
     setShowAutoConfirm(false);
     showToast("שיבוץ אוטומטי הושלם ✓");
@@ -834,31 +834,70 @@ export default function App() {
             );
           })()}
 
-          {/* Availability selection */}
-          {relevantDays.map(date=>{
-            const onVac = isOnVacation(currentUser.id, date);
-            return (
-              <div key={dateKey(date)} style={S.card}>
-                <div style={{fontWeight:"800",fontSize:13,marginBottom:8}}>{formatDate(date)}</div>
-                {onVac ? (
-                  <div style={{background:"#d1fae5",border:"1px solid #6ee7b7",borderRadius:"10px",padding:"12px",textAlign:"center",color:"#065f46",fontWeight:"700",fontSize:14}}>
-                    🌴 חופשה נעימה! 😊
-                  </div>
-                ) : (
-                  <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-                    {(DAY_SHIFTS[date.getDay()]||[]).filter(sh=>(sh.slots[myRole]||0)>0).map(sh=>{
-                      const active=isAv(currentUser.id,date,sh.id);
+          {/* Availability selection — weekly grid */}
+          <div style={S.card}>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:420}}>
+                <thead>
+                  <tr>
+                    <th style={{background:"var(--color-background-secondary, #f1f5f9)",padding:"7px 8px",border:"0.5px solid #e2e8f0",fontWeight:"600",textAlign:"right",minWidth:70,color:"#475569"}}></th>
+                    {weekDates.map(date=>{
+                      const shifts=(DAY_SHIFTS[date.getDay()]||[]).filter(sh=>(sh.slots[myRole]||0)>0);
+                      if(!shifts.length) return null;
                       return (
-                        <button key={sh.id} style={S.chip(active)} onClick={()=>!locked&&toggleAv(date,sh.id)} disabled={locked&&!active}>
-                          {active?"✓ ":""}{sh.label} <span style={{fontSize:10,opacity:0.7,fontWeight:"400"}}>{sh.time}</span>
-                        </button>
+                        <th key={dateKey(date)} style={{background:"var(--color-background-secondary, #f1f5f9)",padding:"7px 6px",border:"0.5px solid #e2e8f0",fontWeight:"600",textAlign:"center",color:"#1e293b"}}>
+                          <div style={{fontSize:12}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
+                          <div style={{fontSize:10,color:"#64748b",fontWeight:"400"}}>{formatDateShort(date)}</div>
+                        </th>
                       );
                     })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Get all unique shift types for this role */}
+                  {[{id:"morning",label:"בוקר"},{id:"evening",label:"ערב"},{id:"open",label:"פתיחה"},{id:"close",label:"סגירה"}].map(shType=>{
+                    // Check if any day has this shift for this role
+                    const hasShift = weekDates.some(date=>(DAY_SHIFTS[date.getDay()]||[]).some(sh=>sh.id===shType.id&&(sh.slots[myRole]||0)>0));
+                    if(!hasShift) return null;
+                    return (
+                      <tr key={shType.id}>
+                        <td style={{padding:"7px 8px",border:"0.5px solid #e2e8f0",background:"var(--color-background-secondary, #f1f5f9)",fontWeight:"600",fontSize:11,color:"#475569",whiteSpace:"nowrap"}}>
+                          {shType.label}<br/>
+                          <span style={{fontWeight:"400",color:"#94a3b8",fontSize:10}}>
+                            {weekDates.find(d=>(DAY_SHIFTS[d.getDay()]||[]).find(s=>s.id===shType.id))&&
+                              (DAY_SHIFTS[weekDates.find(d=>(DAY_SHIFTS[d.getDay()]||[]).find(s=>s.id===shType.id)).getDay()]||[]).find(s=>s.id===shType.id)?.time}
+                          </span>
+                        </td>
+                        {weekDates.map(date=>{
+                          const shift=(DAY_SHIFTS[date.getDay()]||[]).find(sh=>sh.id===shType.id&&(sh.slots[myRole]||0)>0);
+                          if(!shift) return <td key={dateKey(date)} style={{padding:"6px",border:"0.5px solid #e2e8f0",background:"#f8fafc",textAlign:"center",color:"#e2e8f0",fontSize:11}}>—</td>;
+                          const onVac=isOnVacation(currentUser.id,date);
+                          const active=isAv(currentUser.id,date,shift.id);
+                          const isMorning=shift.id==="morning"||shift.id==="open";
+                          if(onVac) return <td key={dateKey(date)} style={{padding:"6px",border:"0.5px solid #e2e8f0",textAlign:"center",background:"#d1fae5"}}>🌴</td>;
+                          return (
+                            <td key={dateKey(date)} style={{padding:"5px",border:"0.5px solid #e2e8f0",textAlign:"center"}}>
+                              <button
+                                onClick={()=>!locked&&toggleAv(date,shift.id)}
+                                disabled={locked&&!active}
+                                style={{
+                                  width:"100%",padding:"7px 4px",borderRadius:"8px",fontSize:12,fontWeight:"600",cursor:locked&&!active?"default":"pointer",
+                                  border:`1.5px ${active?"solid":"dashed"} ${active?(isMorning?"#378ADD":"#7F77DD"):"#cbd5e1"}`,
+                                  background:active?(isMorning?"#E6F1FB":"#EEEDFE"):"transparent",
+                                  color:active?(isMorning?"#0C447C":"#3C3489"):"#94a3b8",
+                                }}>
+                                {active?"✓":"+"}
+                              </button>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           {/* Vacation request */}
           <div style={S.card}>
