@@ -337,7 +337,7 @@ export default function App() {
   const [changePwNew, setChangePwNew]     = useState("");
   const [changePwNew2, setChangePwNew2]   = useState("");
   const [changePwErr, setChangePwErr]     = useState("");
-  const fileRef = useRef(null);
+  const [hoveredEmp, setHoveredEmp] = useState(null);
 
   useEffect(() => {
     // Load from localStorage as fast fallback while Firebase loads
@@ -1387,16 +1387,24 @@ export default function App() {
                               {missingPh&&<div style={{fontSize:9,color:"#dc2626",fontWeight:"700",marginBottom:2}}>⚠️ חסר</div>}
                               {phAll.map(({id,shift})=>{
                                 const emp=employees.find(e=>e.id===id);
-                                return <div key={id} style={{padding:"1px 0"}}>
-                                  <span style={{fontSize:12,fontWeight:"500",color:"#0369a1",display:"block"}}>{emp?.name}</span>
+                                const isHovered=hoveredEmp===id;
+                                return <div key={id}
+                                  style={{padding:"2px 3px",borderRadius:4,background:isHovered?"#bfdbfe":"transparent",transition:"background 0.15s",cursor:"default"}}
+                                  onMouseEnter={()=>setHoveredEmp(id)}
+                                  onMouseLeave={()=>setHoveredEmp(null)}>
+                                  <span style={{fontSize:12,fontWeight:isHovered?"700":"500",color:"#0369a1",display:"block"}}>{emp?.name}</span>
                                 </div>;
                               })}
                               {frMorning.length>0&&phAll.length>0&&<div style={{height:1,background:"#e2e8f0",margin:"3px 0"}}></div>}
                               {missingFr&&<div style={{fontSize:9,color:"#dc2626",fontWeight:"700",marginBottom:2}}>⚠️ חסר</div>}
                               {frMorning.map(id=>{
                                 const emp=employees.find(e=>e.id===id);
-                                return <div key={id} style={{padding:"1px 0"}}>
-                                  <span style={{fontSize:12,fontWeight:"500",color:"#7e22ce",display:"block"}}>{emp?.name}</span>
+                                const isHovered=hoveredEmp===id;
+                                return <div key={id}
+                                  style={{padding:"2px 3px",borderRadius:4,background:isHovered?"#ede9fe":"transparent",transition:"background 0.15s",cursor:"default"}}
+                                  onMouseEnter={()=>setHoveredEmp(id)}
+                                  onMouseLeave={()=>setHoveredEmp(null)}>
+                                  <span style={{fontSize:12,fontWeight:isHovered?"700":"500",color:"#7e22ce",display:"block"}}>{emp?.name}</span>
                                 </div>;
                               })}
                               {note&&<div style={{fontSize:9,color:"#1e293b",marginTop:3,borderTop:"0.5px solid #e2e8f0",paddingTop:2}}>{note}</div>}
@@ -1442,16 +1450,24 @@ export default function App() {
                             {missingPh&&<div style={{fontSize:9,color:"#dc2626",fontWeight:"700",marginBottom:2}}>⚠️ חסר</div>}
                             {phEvening.map(id=>{
                               const emp=employees.find(e=>e.id===id);
-                              return <div key={id} style={{padding:"1px 0"}}>
-                                <span style={{fontSize:12,fontWeight:"500",color:"#0369a1",display:"block"}}>{emp?.name}</span>
+                              const isHovered=hoveredEmp===id;
+                              return <div key={id}
+                                style={{padding:"2px 3px",borderRadius:4,background:isHovered?"#bfdbfe":"transparent",transition:"background 0.15s",cursor:"default"}}
+                                onMouseEnter={()=>setHoveredEmp(id)}
+                                onMouseLeave={()=>setHoveredEmp(null)}>
+                                <span style={{fontSize:12,fontWeight:isHovered?"700":"500",color:"#0369a1",display:"block"}}>{emp?.name}</span>
                               </div>;
                             })}
                             {frEvening.length>0&&phEvening.length>0&&<div style={{height:1,background:"#e2e8f0",margin:"3px 0"}}></div>}
                             {missingFr&&(eveningShift.slots["פרח"]||0)>0&&<div style={{fontSize:9,color:"#dc2626",fontWeight:"700",marginBottom:2}}>⚠️ חסר</div>}
                             {frEvening.map(id=>{
                               const emp=employees.find(e=>e.id===id);
-                              return <div key={id} style={{padding:"1px 0"}}>
-                                <span style={{fontSize:12,fontWeight:"500",color:"#7e22ce",display:"block"}}>{emp?.name}</span>
+                              const isHovered=hoveredEmp===id;
+                              return <div key={id}
+                                style={{padding:"2px 3px",borderRadius:4,background:isHovered?"#ede9fe":"transparent",transition:"background 0.15s",cursor:"default"}}
+                                onMouseEnter={()=>setHoveredEmp(id)}
+                                onMouseLeave={()=>setHoveredEmp(null)}>
+                                <span style={{fontSize:12,fontWeight:isHovered?"700":"500",color:"#7e22ce",display:"block"}}>{emp?.name}</span>
                               </div>;
                             })}
                             {note&&<div style={{fontSize:9,color:"#1e293b",marginTop:3,borderTop:"0.5px solid #e2e8f0",paddingTop:2}}>{note}</div>}
