@@ -329,6 +329,11 @@ export default function App() {
   const [vacStart, setVacStart] = useState("");
   const [vacEnd, setVacEnd] = useState("");
   const [vacNote, setVacNote] = useState("");
+  const [manualVacEmp, setManualVacEmp] = useState("");
+  const [manualVacType, setManualVacType] = useState("יום בודד");
+  const [manualVacStart, setManualVacStart] = useState("");
+  const [manualVacEnd, setManualVacEnd] = useState("");
+  const [manualVacNote, setManualVacNote] = useState("");
   const weekDates = getWeekDates(weekOffset, published); // empId -> [{start, end, type, status, note}]
   const [dayRemarks, setDayRemarks] = useState({}); // dateKey -> ["הורדת מבצע", ...]
   const [shiftNotes, setShiftNotes] = useState({}); // dateKey_shiftId -> string
@@ -1632,25 +1637,27 @@ export default function App() {
                                   const emp=employees.find(e=>e.id===id);
                                   const isHov=hoveredEmp===id;
                                   return (
-                                    <button key={id}
-                                      draggable
-                                      onDragStart={()=>{ dragRef.current={empId:id,date,shiftId:shift.id,role}; setHoveredEmp(id); }}
-                                      onDragEnd={()=>{ dragRef.current=null; setHoveredEmp(null); }}
-                                      onDragOver={e=>e.preventDefault()}
-                                      onDrop={e=>{ e.preventDefault(); handleDrop(date,shift.id,role,id); }}
-                                      style={{background:isHov?"#bbf7d0":"#dcfce7",border:`1.5px solid ${isHov?"#16a34a":"#22c55e"}`,borderRadius:"6px",padding:"2px 4px",fontSize:10,fontWeight:isHov?"800":"700",color:"#15803d",cursor:"grab",width:"100%",transition:"all 0.15s",transform:isHov?"scale(1.02)":"scale(1)"}}
-                                      onClick={()=>toggleAssign(date,shift.id,role,id)}
-                                      onMouseEnter={()=>setHoveredEmp(id)}
-                                      onMouseLeave={()=>setHoveredEmp(null)}>
-                                      ✓ {emp?.name}
-                                    </button>
-                                    <input
-                                      style={{width:"100%",fontSize:9,padding:"2px 4px",border:"1px solid #e2e8f0",borderRadius:4,color:"#475569",background:"#f8fafc",marginTop:1,boxSizing:"border-box"}}
-                                      placeholder="הערה לעובד..."
-                                      value={getEmpShiftNote(id,date,shift.id)}
-                                      onChange={e=>setEmpShiftNote(id,date,shift.id,e.target.value)}
-                                      onClick={e=>e.stopPropagation()}
-                                    />
+                                    <div key={id}>
+                                      <button
+                                        draggable
+                                        onDragStart={()=>{ dragRef.current={empId:id,date,shiftId:shift.id,role}; setHoveredEmp(id); }}
+                                        onDragEnd={()=>{ dragRef.current=null; setHoveredEmp(null); }}
+                                        onDragOver={e=>e.preventDefault()}
+                                        onDrop={e=>{ e.preventDefault(); handleDrop(date,shift.id,role,id); }}
+                                        style={{background:isHov?"#bbf7d0":"#dcfce7",border:`1.5px solid ${isHov?"#16a34a":"#22c55e"}`,borderRadius:"6px",padding:"2px 4px",fontSize:10,fontWeight:isHov?"800":"700",color:"#15803d",cursor:"grab",width:"100%",transition:"all 0.15s",transform:isHov?"scale(1.02)":"scale(1)"}}
+                                        onClick={()=>toggleAssign(date,shift.id,role,id)}
+                                        onMouseEnter={()=>setHoveredEmp(id)}
+                                        onMouseLeave={()=>setHoveredEmp(null)}>
+                                        ✓ {emp?.name}
+                                      </button>
+                                      <input
+                                        style={{width:"100%",fontSize:9,padding:"2px 4px",border:"1px solid #e2e8f0",borderRadius:4,color:"#475569",background:"#f8fafc",marginTop:1,boxSizing:"border-box"}}
+                                        placeholder="הערה לעובד..."
+                                        value={getEmpShiftNote(id,date,shift.id)}
+                                        onChange={e=>setEmpShiftNote(id,date,shift.id,e.target.value)}
+                                        onClick={e=>e.stopPropagation()}
+                                      />
+                                    </div>
                                   );
                                 })}
                               </div>
@@ -1854,6 +1861,60 @@ export default function App() {
         {/* ── VACATIONS TAB ── */}
         {managerTab==="vacations" && (
           <div>
+            {/* הוספה ידנית */}
+            <div style={{...S.card, marginBottom:16}}>
+              <div style={S.sTitle}>➕ הוסף חופשה ידנית</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <select style={{...S.input,width:"100%"}}
+                  value={manualVacEmp} onChange={e=>setManualVacEmp(e.target.value)}>
+                  <option value="">בחר/י עובד/ת</option>
+                  {employees.map(emp=><option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>)}
+                </select>
+                <div style={{display:"flex",gap:8}}>
+                  {["יום בודד","טווח תאריכים"].map(t=>(
+                    <button key={t} style={{...S.chip(manualVacType===t),flex:1,textAlign:"center"}} onClick={()=>setManualVacType(t)}>{t}</button>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:120}}>
+                    <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>{manualVacType==="יום בודד"?"תאריך":"מתאריך"} (DD/MM/YYYY)</div>
+                    <input style={{...S.input,width:"100%",boxSizing:"border-box"}} placeholder="05/07/2026" maxLength={10}
+                      value={manualVacStart} onChange={e=>{
+                        let v=e.target.value.replace(/[^0-9/]/g,"");
+                        if(v.length===2&&!v.includes("/")) v=v+"/";
+                        if(v.length===5&&v.split("/").length===2) v=v+"/";
+                        setManualVacStart(v);
+                      }}/>
+                  </div>
+                  {manualVacType==="טווח תאריכים" && (
+                    <div style={{flex:1,minWidth:120}}>
+                      <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>עד תאריך (DD/MM/YYYY)</div>
+                      <input style={{...S.input,width:"100%",boxSizing:"border-box"}} placeholder="08/07/2026" maxLength={10}
+                        value={manualVacEnd} onChange={e=>{
+                          let v=e.target.value.replace(/[^0-9/]/g,"");
+                          if(v.length===2&&!v.includes("/")) v=v+"/";
+                          if(v.length===5&&v.split("/").length===2) v=v+"/";
+                          setManualVacEnd(v);
+                        }}/>
+                    </div>
+                  )}
+                </div>
+                <input style={{...S.input,width:"100%",boxSizing:"border-box"}} placeholder="הערה (אופציונלי)"
+                  value={manualVacNote} onChange={e=>setManualVacNote(e.target.value)}/>
+                <button style={{...S.btn("#22c55e"),width:"100%"}} onClick={()=>{
+                  if(!manualVacEmp||!manualVacStart){showToast("נא לבחור עובד ותאריך","err");return;}
+                  const end = manualVacType==="יום בודד"?manualVacStart:manualVacEnd||manualVacStart;
+                  const req = {id:Date.now(),start:manualVacStart,end,type:manualVacType,note:manualVacNote,status:"approved"};
+                  const empId = Number(manualVacEmp);
+                  const updated = {...vacations,[empId]:[...(vacations[empId]||[]),req]};
+                  setVacations(updated);
+                  fbSave({employees,availability,assigned,notes,empNotes,empPasswords,managerPassword,fridayRota,published,dayRemarks,shiftNotes,vacations:updated,empShiftNotes});
+                  setManualVacEmp(""); setManualVacStart(""); setManualVacEnd(""); setManualVacNote("");
+                  showToast("חופשה נוספה ✓");
+                }}>+ הוסף חופשה מאושרת</button>
+              </div>
+            </div>
+
             {/* Pending requests */}
             <div style={{fontWeight:"800",fontSize:14,marginBottom:10}}>⏳ בקשות ממתינות ({pendingVacations.length})</div>
             {pendingVacations.length===0 && <div style={{...S.card,color:"#94a3b8",textAlign:"center",padding:30}}>אין בקשות ממתינות</div>}
