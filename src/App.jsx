@@ -900,127 +900,208 @@ export default function App() {
             </div>
           </div>
 
-          {/* Published schedule — capsule design */}
+          {/* Published schedule */}
           {published && (()=>{
+            const MOOD_EMOJIS = ["😏","😌","☺️","😃","😇","🤩","🥳"];
+            // Build ordered shift list with date objects
+            const myShiftList = [];
+            weekDates.forEach(date=>{
+              (DAY_SHIFTS[date.getDay()]||[]).forEach(sh=>{
+                if(getAssigned(date,sh.id,myRole).includes(currentUser.id)){
+                  const shiftLabel = ["morning","open"].includes(sh.id) ? "בוקר" : sh.id==="close" ? "סגירה" : "ערב";
+                  const shiftIcon = ["morning","open"].includes(sh.id) ? "☀️" : "🌙";
+                  myShiftList.push({date, sh, shiftLabel, shiftIcon});
+                }
+              });
+            });
+            const total = myShiftList.length;
+            const now = new Date();
+            const doneSoFar = myShiftList.filter(({date,sh})=>{
+              const [endH] = sh.time.split("-")[1]?.split(":").map(Number)||[23];
+              const endDate = new Date(date);
+              endDate.setHours(endH,0,0,0);
+              return endDate < now;
+            }).length;
+            const todayIdx = myShiftList.findIndex(({date,sh})=>{
+              const d = new Date(date);
+              const [startH] = sh.time.split(":").map(Number);
+              const [endH] = sh.time.split("-")[1]?.split(":").map(Number)||[23];
+              const start = new Date(date); start.setHours(startH,0,0,0);
+              const end = new Date(date); end.setHours(endH,0,0,0);
+              return now >= start && now <= end;
+            });
+            const moodIdx = total > 0 ? Math.round((doneSoFar / total) * (MOOD_EMOJIS.length - 1)) : 0;
+            const moodEmoji = total > 0 ? MOOD_EMOJIS[moodIdx] : "😏";
+            const encouragements = ["השבוע מתחיל — בהצלחה!","יאללה, התחלה טובה!","מצוין, ממשיכים!","כבר באמצע 💪","כמעט שם! 🎉","עשית את זה! 🌟","עשית את זה! 🌟"];
+            const encourage = encouragements[Math.min(doneSoFar, encouragements.length-1)];
+            const isMe = id => id === currentUser.id;
             return (
-              <div style={{...S.card,background:"#fff",border:"1px solid #e2e8f0",padding:0,overflow:"hidden",marginBottom:12}}>
-                <div style={{background:"#1e293b",padding:"8px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{color:"#f8fafc",fontWeight:"500",fontSize:13}}>💊 סידור עבודה</span>
-                  <span style={{color:"#22c55e",fontSize:11}}>✓ פורסם</span>
-                </div>
-                <div style={{overflowX:"auto"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,tableLayout:"fixed"}}>
-                    <thead>
-                      <tr style={{background:"#1e293b",color:"#e2e8f0"}}>
-                        <th style={{padding:"7px 6px",textAlign:"right",fontWeight:"500",width:72,fontSize:11,border:"0.5px solid #334155"}}></th>
-                        {weekDates.map(date=>(
-                          <th key={dateKey(date)} style={{padding:"7px 4px",textAlign:"center",fontWeight:"500",fontSize:13,border:"0.5px solid #334155"}}>
-                            <div>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
-                            <div style={{fontSize:11,color:"#94a3b8",fontWeight:"400",marginTop:1}}>{formatDateShort(date)}</div>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* הערות יום */}
-                      <tr>
-                        <td style={{background:"#f8fafc",padding:"3px 6px",borderRight:"3px solid #1e293b",border:"0.5px solid #e2e8f0",fontSize:10,color:"#475569",verticalAlign:"middle",textAlign:"center"}}>📌</td>
-                        {weekDates.map(date=>{
-                          const remarks=getRemarks(date);
-                          return (
-                            <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:3,background:"#fff",verticalAlign:"middle",textAlign:"center"}}>
+              <div style={{marginBottom:12}}>
+                <style>{`.pub-hov { background: #bfdbfe !important; font-weight: 800 !important; border-radius:3px; transition: background 0.15s; } .pub-hov.my-s { background: #fde68a !important; }`}</style>
+
+                {/* Progress block */}
+                {total > 0 && (
+                  <div style={{...S.card, background:"var(--color-background-secondary, #f8fafc)", marginBottom:10}}>
+                    <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:12}}>
+                      <div style={{fontSize:42,lineHeight:1,flexShrink:0}}>{moodEmoji}</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:"700",color:"#1e293b",marginBottom:6}}>{encourage}</div>
+                        <div style={{height:8,background:"#e2e8f0",borderRadius:4,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${(doneSoFar/total)*100}%`,background:"#1D9E75",borderRadius:4,transition:"width 0.5s ease"}}></div>
+                        </div>
+                        <div style={{fontSize:11,color:"#64748b",marginTop:4}}>{doneSoFar} מתוך {total} משמרות הושלמו</div>
+                      </div>
+                    </div>
+                    {/* Day dots */}
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      {myShiftList.map(({date,sh,shiftLabel},i)=>{
+                        const endDate = new Date(date);
+                        const [endH] = sh.time.split("-")[1]?.split(":").map(Number)||[23];
+                        endDate.setHours(endH,0,0,0);
+                        const isDone = endDate < now;
+                        const isToday = i === todayIdx;
+                        const dotColor = isDone ? "#1D9E75" : isToday ? "#378ADD" : "var(--color-background-primary, #fff)";
+                        const dotBorder = isDone ? "#1D9E75" : isToday ? "#378ADD" : "#cbd5e1";
+                        const textColor = isDone||isToday ? "#fff" : "#94a3b8";
+                        return [
+                          <div key={`dot-${i}`} style={{width:28,height:28,borderRadius:"50%",background:dotColor,border:`1.5px solid ${dotBorder}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:isDone?13:10,color:textColor}}>
+                            {isDone ? "✓" : isToday ? "⏰" : date.toLocaleDateString("he-IL",{weekday:"narrow"})}
+                          </div>,
+                          i < myShiftList.length-1 && <div key={`line-${i}`} style={{flex:1,height:2,background:isDone?"#1D9E75":"#e2e8f0",borderRadius:1}}></div>
+                        ];
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Shift cards */}
+                {total > 0 ? myShiftList.map(({date,sh,shiftLabel,shiftIcon},i)=>{
+                  const endDate = new Date(date); const [endH] = sh.time.split("-")[1]?.split(":").map(Number)||[23]; endDate.setHours(endH,0,0,0);
+                  const startDate = new Date(date); const [startH] = sh.time.split(":").map(Number); startDate.setHours(startH,0,0,0);
+                  const isDone = endDate < now;
+                  const isToday = now >= startDate && now <= endDate;
+                  const empNote = getEmpShiftNote(currentUser.id,date,sh.id);
+                  return (
+                    <div key={i} style={{...S.card,opacity:isDone?0.55:1,border:isToday?"1.5px solid #378ADD":"1px solid #e2e8f0",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+                      <div style={{width:36,height:36,borderRadius:8,background:["morning","open"].includes(sh.id)?"#FAEEDA":"#EEEDFE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{shiftIcon}</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:"500",color:"#1e293b"}}>{date.toLocaleDateString("he-IL",{weekday:"long"})} — {shiftLabel}</div>
+                        <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{sh.time}</div>
+                        {empNote&&<div style={{fontSize:11,color:"#64748b",fontStyle:"italic",marginTop:2}}>{empNote}</div>}
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                        <span style={{fontSize:18}}>{MOOD_EMOJIS[Math.round((i/(Math.max(total-1,1)))*(MOOD_EMOJIS.length-1))]}</span>
+                        <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:"500",background:isDone?"#EAF3DE":isToday?"#E6F1FB":"#f1f5f9",color:isDone?"#3B6D11":isToday?"#185FA5":"#94a3b8"}}>
+                          {isDone?"✓ הסתיים":isToday?"היום":"בקרוב"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }) : <div style={{...S.card,color:"#94a3b8",fontSize:13}}>לא שובצת השבוע</div>}
+                <div style={{...S.card,padding:0,overflow:"hidden"}}>
+                  <div style={{background:"#1e293b",padding:"8px 12px",display:"flex",justifyContent:"space-between"}}>
+                    <span style={{color:"#f8fafc",fontWeight:"500",fontSize:13}}>💊 סידור עבודה</span>
+                    <span style={{color:"#22c55e",fontSize:11}}>✓ פורסם</span>
+                  </div>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,tableLayout:"fixed"}}>
+                      <thead>
+                        <tr style={{background:"#1e293b",color:"#e2e8f0"}}>
+                          <th style={{padding:"7px 6px",width:72,border:"0.5px solid #334155"}}></th>
+                          {weekDates.map(date=>(
+                            <th key={dateKey(date)} style={{padding:"7px 4px",textAlign:"center",fontWeight:"500",fontSize:13,border:"0.5px solid #334155"}}>
+                              <div>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
+                              <div style={{fontSize:11,color:"#94a3b8",fontWeight:"400",marginTop:1}}>{formatDateShort(date)}</div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td style={{background:"#f8fafc",padding:"3px 6px",borderRight:"3px solid #1e293b",border:"0.5px solid #e2e8f0",fontSize:10,color:"#475569",verticalAlign:"middle",textAlign:"center"}}>📌</td>
+                          {weekDates.map(date=>{
+                            const remarks=getRemarks(date);
+                            return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:3,background:"#fff",verticalAlign:"middle",textAlign:"center"}}>
                               {remarks.length>0&&<span style={{display:"inline-block",border:"1.5px solid #1e293b",borderRadius:4,padding:"2px 4px",fontSize:9,fontWeight:"500",color:"#1e293b",width:"100%"}}>{remarks.join(" | ")}</span>}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      {/* בוקר */}
-                      <tr>
-                        <td style={{background:"#f8fafc",padding:"6px 4px",borderRight:"3px solid #22c55e",border:"0.5px solid #e2e8f0",verticalAlign:"middle",textAlign:"center"}}>
-                          <span style={{fontSize:14}}>☀️</span>
-                          <span style={{display:"block",fontSize:12,fontWeight:"500",color:"#1e293b"}}>בוקר</span>
-                        </td>
-                        {weekDates.map(date=>{
-                          const dayShifts=DAY_SHIFTS[date.getDay()]||[];
-                          const morningShift=dayShifts.find(s=>["morning","open"].includes(s.id));
-                          const closeShift=dayShifts.find(s=>s.id==="close");
-                          const phMorning=morningShift?getAssigned(date,morningShift.id,"רוקח"):[];
-                          const phClose=closeShift?getAssigned(date,closeShift.id,"רוקח"):[];
-                          const frMorning=morningShift?getAssigned(date,morningShift.id,"פרח"):[];
-                          const phAll=[...phMorning.map(id=>({id,shift:morningShift})),...phClose.map(id=>({id,shift:closeShift}))];
-                          const note=morningShift?getShiftNote(date,morningShift.id):"";
-                          const isMe=id=>id===currentUser.id;
-                          return (
-                            <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff"}}>
-                              {!morningShift&&!closeShift?<span style={{color:"#e2e8f0",fontSize:10}}>—</span>:(
+                            </td>;
+                          })}
+                        </tr>
+                        {/* בוקר */}
+                        <tr>
+                          <td style={{background:"#f8fafc",padding:"6px 4px",borderRight:"3px solid #22c55e",border:"0.5px solid #e2e8f0",verticalAlign:"middle",textAlign:"center"}}>
+                            <span style={{fontSize:14}}>☀️</span><span style={{display:"block",fontSize:12,fontWeight:"500",color:"#1e293b"}}>בוקר</span>
+                          </td>
+                          {weekDates.map(date=>{
+                            const ds=DAY_SHIFTS[date.getDay()]||[];
+                            const ms=ds.find(s=>["morning","open"].includes(s.id));
+                            const cs=ds.find(s=>s.id==="close");
+                            const phM=ms?getAssigned(date,ms.id,"רוקח"):[];
+                            const phC=cs?getAssigned(date,cs.id,"רוקח"):[];
+                            const frM=ms?getAssigned(date,ms.id,"פרח"):[];
+                            const phAll=[...phM.map(id=>({id,shift:ms})),...phC.map(id=>({id,shift:cs}))];
+                            const note=ms?getShiftNote(date,ms.id):"";
+                            return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff"}}>
+                              {!ms&&!cs?<span style={{color:"#e2e8f0",fontSize:10}}>—</span>:(
                                 <div style={{textAlign:"right"}}>
-                                  {phAll.map(({id,shift})=>{
-                                    const emp=employees.find(e=>e.id===id);
-                                    return <div key={id} style={{padding:"2px 0",background:isMe(id)?"#fef9c3":"transparent",borderRadius:3}}>
-                                      <span style={{fontSize:12,fontWeight:"500",color:"#0369a1",display:"block"}}>{emp?.name}{isMe(id)?" ⭐":""}</span>
-                                      <span style={{fontSize:8,color:"#64748b",display:"block"}}>{shift?.time}</span>
-                                      {getEmpShiftNote(id,date,shift?.id)&&<span style={{fontSize:9,color:"#475569",display:"block",fontStyle:"italic"}}>{getEmpShiftNote(id,date,shift?.id)}</span>}
-                                    </div>;
-                                  })}
-                                  {frMorning.length>0&&phAll.length>0&&<div style={{height:1,background:"#e2e8f0",margin:"3px 0"}}></div>}
-                                  {frMorning.map(id=>{
-                                    const emp=employees.find(e=>e.id===id);
-                                    return <div key={id} style={{padding:"2px 0",background:isMe(id)?"#fef9c3":"transparent",borderRadius:3}}>
-                                      <span style={{fontSize:12,fontWeight:"500",color:"#7e22ce",display:"block"}}>{emp?.name}{isMe(id)?" ⭐":""}</span>
-                                      <span style={{fontSize:8,color:"#64748b",display:"block"}}>{morningShift?.time}</span>
-                                    </div>;
-                                  })}
+                                  {phAll.map(({id,shift})=>{const emp=employees.find(e=>e.id===id); return <div key={id} style={{cursor:"default"}}
+                                    onMouseEnter={()=>document.querySelectorAll(`.pe-${id}`).forEach(el=>el.classList.add("pub-hov"))}
+                                    onMouseLeave={()=>document.querySelectorAll(`.pe-${id}`).forEach(el=>el.classList.remove("pub-hov"))}>
+                                    <span className={`pe-${id}${isMe(id)?" my-s":""}`} style={{fontSize:12,fontWeight:isMe(id)?"700":"500",color:isMe(id)?"#92400e":"#0369a1",display:"block",padding:"1px 2px",borderRadius:3,background:isMe(id)?"#fef9c3":"transparent"}}>{emp?.name}{isMe(id)?" ⭐":""}</span>
+                                    <span style={{fontSize:8,color:"#64748b"}}>{shift?.time}</span>
+                                    {getEmpShiftNote(id,date,shift?.id)&&<span style={{fontSize:9,color:"#475569",display:"block",fontStyle:"italic"}}>{getEmpShiftNote(id,date,shift?.id)}</span>}
+                                  </div>;})}
+                                  {frM.length>0&&phAll.length>0&&<div style={{height:1,background:"#e2e8f0",margin:"3px 0"}}></div>}
+                                  {frM.map(id=>{const emp=employees.find(e=>e.id===id); return <div key={id} style={{cursor:"default"}}
+                                    onMouseEnter={()=>document.querySelectorAll(`.pe-${id}`).forEach(el=>el.classList.add("pub-hov"))}
+                                    onMouseLeave={()=>document.querySelectorAll(`.pe-${id}`).forEach(el=>el.classList.remove("pub-hov"))}>
+                                    <span className={`pe-${id}${isMe(id)?" my-s":""}`} style={{fontSize:12,fontWeight:isMe(id)?"700":"500",color:isMe(id)?"#92400e":"#7e22ce",display:"block",padding:"1px 2px",borderRadius:3,background:isMe(id)?"#fef9c3":"transparent"}}>{emp?.name}{isMe(id)?" ⭐":""}</span>
+                                    <span style={{fontSize:8,color:"#64748b"}}>{ms?.time}</span>
+                                    {getEmpShiftNote(id,date,ms?.id)&&<span style={{fontSize:9,color:"#475569",display:"block",fontStyle:"italic"}}>{getEmpShiftNote(id,date,ms?.id)}</span>}
+                                  </div>;})}
                                   {note&&<div style={{fontSize:9,color:"#1e293b",marginTop:3,borderTop:"0.5px solid #e2e8f0",paddingTop:2}}>{note}</div>}
                                 </div>
                               )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      {/* פס */}
-                      <tr><td colSpan={weekDates.length+1} style={{background:"#1e293b",height:4,padding:0,border:"none"}}></td></tr>
-                      {/* ערב */}
-                      <tr>
-                        <td style={{background:"#f8fafc",padding:"6px 4px",borderRight:"3px solid #6366f1",border:"0.5px solid #e2e8f0",verticalAlign:"middle",textAlign:"center"}}>
-                          <span style={{fontSize:14}}>🌙</span>
-                          <span style={{display:"block",fontSize:12,fontWeight:"500",color:"#1e293b"}}>ערב</span>
-                        </td>
-                        {weekDates.map(date=>{
-                          const dayShifts=DAY_SHIFTS[date.getDay()]||[];
-                          const eveningShift=dayShifts.find(s=>s.id==="evening");
-                          if(!eveningShift) return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",background:"#f8fafc",textAlign:"center",color:"#e2e8f0",fontSize:10}}>—</td>;
-                          const phEvening=getAssigned(date,eveningShift.id,"רוקח");
-                          const frEvening=getAssigned(date,eveningShift.id,"פרח");
-                          const note=getShiftNote(date,eveningShift.id);
-                          const isMe=id=>id===currentUser.id;
-                          return (
-                            <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff"}}>
+                            </td>;
+                          })}
+                        </tr>
+                        <tr><td colSpan={weekDates.length+1} style={{background:"#1e293b",height:4,padding:0,border:"none"}}></td></tr>
+                        {/* ערב */}
+                        <tr>
+                          <td style={{background:"#f8fafc",padding:"6px 4px",borderRight:"3px solid #6366f1",border:"0.5px solid #e2e8f0",verticalAlign:"middle",textAlign:"center"}}>
+                            <span style={{fontSize:14}}>🌙</span><span style={{display:"block",fontSize:12,fontWeight:"500",color:"#1e293b"}}>ערב</span>
+                          </td>
+                          {weekDates.map(date=>{
+                            const ds=DAY_SHIFTS[date.getDay()]||[];
+                            const es=ds.find(s=>s.id==="evening");
+                            if(!es) return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",background:"#f8fafc",textAlign:"center",color:"#e2e8f0",fontSize:10}}>—</td>;
+                            const phE=getAssigned(date,es.id,"רוקח");
+                            const frE=getAssigned(date,es.id,"פרח");
+                            const note=getShiftNote(date,es.id);
+                            return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff"}}>
                               <div style={{textAlign:"right"}}>
-                                {phEvening.map(id=>{
-                                  const emp=employees.find(e=>e.id===id);
-                                  return <div key={id} style={{padding:"2px 0",background:isMe(id)?"#fef9c3":"transparent",borderRadius:3}}>
-                                    <span style={{fontSize:12,fontWeight:"500",color:"#0369a1",display:"block"}}>{emp?.name}{isMe(id)?" ⭐":""}</span>
-                                    <span style={{fontSize:8,color:"#64748b",display:"block"}}>{eveningShift.time}</span>
-                                    {getEmpShiftNote(id,date,eveningShift.id)&&<span style={{fontSize:9,color:"#475569",display:"block",fontStyle:"italic"}}>{getEmpShiftNote(id,date,eveningShift.id)}</span>}
-                                  </div>;
-                                })}
-                                {frEvening.length>0&&phEvening.length>0&&<div style={{height:1,background:"#e2e8f0",margin:"3px 0"}}></div>}
-                                {frEvening.map(id=>{
-                                  const emp=employees.find(e=>e.id===id);
-                                  return <div key={id} style={{padding:"2px 0",background:isMe(id)?"#fef9c3":"transparent",borderRadius:3}}>
-                                    <span style={{fontSize:12,fontWeight:"500",color:"#7e22ce",display:"block"}}>{emp?.name}{isMe(id)?" ⭐":""}</span>
-                                    <span style={{fontSize:8,color:"#64748b",display:"block"}}>{eveningShift.time}</span>
-                                    {getEmpShiftNote(id,date,eveningShift.id)&&<span style={{fontSize:9,color:"#475569",display:"block",fontStyle:"italic"}}>{getEmpShiftNote(id,date,eveningShift.id)}</span>}
-                                  </div>;
-                                })}
+                                {phE.map(id=>{const emp=employees.find(e=>e.id===id); return <div key={id} style={{cursor:"default"}}
+                                  onMouseEnter={()=>document.querySelectorAll(`.pe-${id}`).forEach(el=>el.classList.add("pub-hov"))}
+                                  onMouseLeave={()=>document.querySelectorAll(`.pe-${id}`).forEach(el=>el.classList.remove("pub-hov"))}>
+                                  <span className={`pe-${id}${isMe(id)?" my-s":""}`} style={{fontSize:12,fontWeight:isMe(id)?"700":"500",color:isMe(id)?"#92400e":"#0369a1",display:"block",padding:"1px 2px",borderRadius:3,background:isMe(id)?"#fef9c3":"transparent"}}>{emp?.name}{isMe(id)?" ⭐":""}</span>
+                                  <span style={{fontSize:8,color:"#64748b"}}>{es.time}</span>
+                                  {getEmpShiftNote(id,date,es.id)&&<span style={{fontSize:9,color:"#475569",display:"block",fontStyle:"italic"}}>{getEmpShiftNote(id,date,es.id)}</span>}
+                                </div>;})}
+                                {frE.length>0&&phE.length>0&&<div style={{height:1,background:"#e2e8f0",margin:"3px 0"}}></div>}
+                                {frE.map(id=>{const emp=employees.find(e=>e.id===id); return <div key={id} style={{cursor:"default"}}
+                                  onMouseEnter={()=>document.querySelectorAll(`.pe-${id}`).forEach(el=>el.classList.add("pub-hov"))}
+                                  onMouseLeave={()=>document.querySelectorAll(`.pe-${id}`).forEach(el=>el.classList.remove("pub-hov"))}>
+                                  <span className={`pe-${id}${isMe(id)?" my-s":""}`} style={{fontSize:12,fontWeight:isMe(id)?"700":"500",color:isMe(id)?"#92400e":"#7e22ce",display:"block",padding:"1px 2px",borderRadius:3,background:isMe(id)?"#fef9c3":"transparent"}}>{emp?.name}{isMe(id)?" ⭐":""}</span>
+                                  <span style={{fontSize:8,color:"#64748b"}}>{es.time}</span>
+                                  {getEmpShiftNote(id,date,es.id)&&<span style={{fontSize:9,color:"#475569",display:"block",fontStyle:"italic"}}>{getEmpShiftNote(id,date,es.id)}</span>}
+                                </div>;})}
                                 {note&&<div style={{fontSize:9,color:"#1e293b",marginTop:3,borderTop:"0.5px solid #e2e8f0",paddingTop:2}}>{note}</div>}
                               </div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    </tbody>
-                  </table>
+                            </td>;
+                          })}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             );
@@ -1284,7 +1365,7 @@ export default function App() {
       <style>{`
         [data-empid].emp-hov button.emp-assigned { background: #16a34a !important; border-color: #14532d !important; color: #fff !important; font-weight: 800 !important; }
         [data-empid].emp-hov button.emp-avail { background: #2563eb !important; border-color: #1e3a8a !important; color: #fff !important; font-weight: 800 !important; }
-        [data-empid].emp-hov button.emp-nonavail { background: #475569 !important; border-color: #1e293b !important; color: #fff !important; opacity: 1 !important; }
+        .emp-hovering [data-empid]:not(.emp-hov) button.emp-nonavail { display: none !important; }
       `}</style>
       <div style={S.header}>
         <div style={S.logo}>{APP_NAME} — מנהל/ת</div>
@@ -1598,7 +1679,7 @@ export default function App() {
 
             {/* Weekly assignment grid */}
             <div style={{overflowX:"auto",marginBottom:12}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,background:"#fff",borderRadius:12,overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.08)",minWidth:500}}>
+              <table id="assign-table" style={{width:"100%",borderCollapse:"collapse",fontSize:12,background:"#fff",borderRadius:12,overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.08)",minWidth:500}}>
                 <thead>
                   <tr style={{background:"#1e293b",color:"#f8fafc"}}>
                     <th style={{padding:"8px",textAlign:"right",fontWeight:"600",minWidth:80,fontSize:11}}>משמרת</th>
@@ -1642,8 +1723,14 @@ export default function App() {
                                   const emp=employees.find(e=>e.id===id);
                                   return (
                                     <div key={id} data-empid={id}
-                                      onMouseEnter={()=>{document.querySelectorAll(`[data-empid="${id}"]`).forEach(el=>el.classList.add("emp-hov"));}}
-                                      onMouseLeave={()=>{document.querySelectorAll(`[data-empid="${id}"]`).forEach(el=>el.classList.remove("emp-hov"));}}>
+                                      onMouseEnter={()=>{
+                                        document.querySelectorAll(`[data-empid="${id}"]`).forEach(el=>el.classList.add("emp-hov"));
+                                        document.getElementById("assign-table")?.classList.add("emp-hovering");
+                                      }}
+                                      onMouseLeave={()=>{
+                                        document.querySelectorAll(`[data-empid="${id}"]`).forEach(el=>el.classList.remove("emp-hov"));
+                                        document.getElementById("assign-table")?.classList.remove("emp-hovering");
+                                      }}>
                                       <button
                                         draggable
                                         onDragStart={()=>{ dragRef.current={empId:id,date,shiftId:shift.id,role}; }}
@@ -1672,8 +1759,14 @@ export default function App() {
                                 onDrop={e=>{ e.preventDefault(); handleDrop(date,shift.id,role,null); }}>
                                 {avail.filter(e=>!assignedIds.includes(e.id)).map(emp=>(
                                   <div key={emp.id} data-empid={emp.id}
-                                    onMouseEnter={()=>{document.querySelectorAll(`[data-empid="${emp.id}"]`).forEach(el=>el.classList.add("emp-hov"));}}
-                                    onMouseLeave={()=>{document.querySelectorAll(`[data-empid="${emp.id}"]`).forEach(el=>el.classList.remove("emp-hov"));}}>
+                                    onMouseEnter={()=>{
+                                      document.querySelectorAll(`[data-empid="${emp.id}"]`).forEach(el=>el.classList.add("emp-hov"));
+                                      document.getElementById("assign-table")?.classList.add("emp-hovering");
+                                    }}
+                                    onMouseLeave={()=>{
+                                      document.querySelectorAll(`[data-empid="${emp.id}"]`).forEach(el=>el.classList.remove("emp-hov"));
+                                      document.getElementById("assign-table")?.classList.remove("emp-hovering");
+                                    }}>
                                     <button
                                       onDragOver={e=>e.preventDefault()}
                                       onDrop={e=>{ e.preventDefault(); handleDrop(date,shift.id,role,emp.id); }}
