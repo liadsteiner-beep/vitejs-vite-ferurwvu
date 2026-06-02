@@ -331,7 +331,7 @@ export default function App() {
   const fileRef = useRef(null);
 
   useEffect(() => {
-    // First load from localStorage as fast fallback
+    // Load from localStorage as fast fallback while Firebase loads
     const local = loadLocalData();
     if (local) {
       if (local.employees) {
@@ -350,7 +350,6 @@ export default function App() {
       if (local.shiftNotes)   setShiftNotes(local.shiftNotes);
     }
     // Real-time sync with Firebase
-    const local = loadLocalData();
     let firstSnapshot = true;
     const unsub = onSnapshot(doc(db, "pharmacy", "schedule"), (snap) => {
       if (!snap.exists()) { setFbLoaded(true); return; }
@@ -365,7 +364,6 @@ export default function App() {
         setAvailability(mergedAv);
         firstSnapshot = false;
       } else {
-        // Subsequent updates — just use Firebase data
         if (d.availability) setAvailability(d.availability);
       }
       if (d.assigned)     setAssigned(d.assigned);
