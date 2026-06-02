@@ -1685,12 +1685,10 @@ export default function App() {
                                   </div>
                                 ))}
                                 {nonAvail.map(emp=>(
-                                  <div key={emp.id} data-empid={emp.id}
-                                    onMouseEnter={()=>{document.querySelectorAll(`[data-empid="${emp.id}"]`).forEach(el=>el.classList.add("emp-hov"));}}
-                                    onMouseLeave={()=>{document.querySelectorAll(`[data-empid="${emp.id}"]`).forEach(el=>el.classList.remove("emp-hov"));}}>
+                                  <div key={emp.id}
+                                    onDragOver={e=>e.preventDefault()}
+                                    onDrop={e=>{ e.preventDefault(); handleDrop(date,shift.id,role,emp.id); }}>
                                     <button
-                                      onDragOver={e=>e.preventDefault()}
-                                      onDrop={e=>{ e.preventDefault(); handleDrop(date,shift.id,role,emp.id); }}
                                       className="emp-btn emp-nonavail"
                                       onClick={()=>{const k=avKey(emp.id,date,shift.id);setAvailability(prev=>({...prev,[k]:true}));showToast(`${emp.name} סומן/ה כזמינ/ה ✓`);}}
                                       style={{borderRadius:"6px",padding:"2px 4px",fontSize:10,color:"#94a3b8",cursor:"pointer",width:"100%",transition:"all 0.15s",background:"transparent",border:"1px dashed #cbd5e1",opacity:0.6}}>
