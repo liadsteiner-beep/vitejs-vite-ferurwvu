@@ -1282,9 +1282,9 @@ export default function App() {
   return (
     <div style={S.app}>
       <style>{`
-        [data-empid].emp-hov button.emp-assigned { background: #bbf7d0 !important; border-color: #16a34a !important; font-weight: 800 !important; }
-        [data-empid].emp-hov button.emp-avail { background: #bfdbfe !important; border-color: #2563eb !important; font-weight: 800 !important; }
-        [data-empid].emp-hov button.emp-nonavail { background: #f1f5f9 !important; border-color: #94a3b8 !important; opacity: 1 !important; color: #475569 !important; }
+        [data-empid].emp-hov button.emp-assigned { background: #16a34a !important; border-color: #14532d !important; color: #fff !important; font-weight: 800 !important; }
+        [data-empid].emp-hov button.emp-avail { background: #2563eb !important; border-color: #1e3a8a !important; color: #fff !important; font-weight: 800 !important; }
+        [data-empid].emp-hov button.emp-nonavail { background: #475569 !important; border-color: #1e293b !important; color: #fff !important; opacity: 1 !important; }
       `}</style>
       <div style={S.header}>
         <div style={S.logo}>{APP_NAME} — מנהל/ת</div>
