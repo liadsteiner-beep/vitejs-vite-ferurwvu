@@ -332,6 +332,7 @@ export default function App() {
   const weekDates = getWeekDates(weekOffset, published); // empId -> [{start, end, type, status, note}]
   const [dayRemarks, setDayRemarks] = useState({}); // dateKey -> ["הורדת מבצע", ...]
   const [shiftNotes, setShiftNotes] = useState({}); // dateKey_shiftId -> string
+  const [empShiftNotes, setEmpShiftNotes] = useState({}); // empId_dateKey_shiftId -> string
   const [changePwModal, setChangePwModal] = useState(null); // null | "manager" | empId
   const [changePwOld, setChangePwOld]     = useState("");
   const [changePwNew, setChangePwNew]     = useState("");
@@ -386,6 +387,7 @@ export default function App() {
       if (d.dayRemarks)   setDayRemarks(d.dayRemarks);
       if (d.shiftNotes)   setShiftNotes(d.shiftNotes);
       if (d.vacations)    setVacations(d.vacations);
+      if (d.empShiftNotes) setEmpShiftNotes(d.empShiftNotes);
       setFbLoaded(true);
       // Restore session
       const session = loadSession();
@@ -413,8 +415,8 @@ export default function App() {
 
   useEffect(() => {
     if (!fbLoaded) return; // Don't save before Firebase data is loaded
-    saveData({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations });
-  }, [employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations]);
+    saveData({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes });
+  }, [employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes]);
 
   function showToast(msg, type="ok") { setToast({msg,type}); setTimeout(()=>setToast(null),3000); }
 
@@ -516,6 +518,9 @@ export default function App() {
   function snKey(date, shiftId) { return `${dateKey(date)}_${shiftId}`; }
   function getShiftNote(date, shiftId) { return shiftNotes[snKey(date,shiftId)] || ""; }
   function setShiftNote(date, shiftId, val) { setShiftNotes(prev=>({...prev,[snKey(date,shiftId)]:val})); }
+  const esnKey = (empId, date, shiftId) => `${empId}_${dateKey(date)}_${shiftId}`;
+  function getEmpShiftNote(empId, date, shiftId) { return empShiftNotes[esnKey(empId,date,shiftId)] || ""; }
+  function setEmpShiftNote(empId, date, shiftId, val) { setEmpShiftNotes(prev=>({...prev,[esnKey(empId,date,shiftId)]:val})); }
 
   function openChangePw() {
     setChangePwModal(currentUser.isManager ? "manager" : currentUser.id);
@@ -949,6 +954,7 @@ export default function App() {
                                     return <div key={id} style={{padding:"2px 0",background:isMe(id)?"#fef9c3":"transparent",borderRadius:3}}>
                                       <span style={{fontSize:12,fontWeight:"500",color:"#0369a1",display:"block"}}>{emp?.name}{isMe(id)?" ⭐":""}</span>
                                       <span style={{fontSize:8,color:"#64748b",display:"block"}}>{shift?.time}</span>
+                                      {getEmpShiftNote(id,date,shift?.id)&&<span style={{fontSize:9,color:"#475569",display:"block",fontStyle:"italic"}}>{getEmpShiftNote(id,date,shift?.id)}</span>}
                                     </div>;
                                   })}
                                   {frMorning.length>0&&phAll.length>0&&<div style={{height:1,background:"#e2e8f0",margin:"3px 0"}}></div>}
@@ -990,6 +996,7 @@ export default function App() {
                                   return <div key={id} style={{padding:"2px 0",background:isMe(id)?"#fef9c3":"transparent",borderRadius:3}}>
                                     <span style={{fontSize:12,fontWeight:"500",color:"#0369a1",display:"block"}}>{emp?.name}{isMe(id)?" ⭐":""}</span>
                                     <span style={{fontSize:8,color:"#64748b",display:"block"}}>{eveningShift.time}</span>
+                                    {getEmpShiftNote(id,date,eveningShift.id)&&<span style={{fontSize:9,color:"#475569",display:"block",fontStyle:"italic"}}>{getEmpShiftNote(id,date,eveningShift.id)}</span>}
                                   </div>;
                                 })}
                                 {frEvening.length>0&&phEvening.length>0&&<div style={{height:1,background:"#e2e8f0",margin:"3px 0"}}></div>}
@@ -998,6 +1005,7 @@ export default function App() {
                                   return <div key={id} style={{padding:"2px 0",background:isMe(id)?"#fef9c3":"transparent",borderRadius:3}}>
                                     <span style={{fontSize:12,fontWeight:"500",color:"#7e22ce",display:"block"}}>{emp?.name}{isMe(id)?" ⭐":""}</span>
                                     <span style={{fontSize:8,color:"#64748b",display:"block"}}>{eveningShift.time}</span>
+                                    {getEmpShiftNote(id,date,eveningShift.id)&&<span style={{fontSize:9,color:"#475569",display:"block",fontStyle:"italic"}}>{getEmpShiftNote(id,date,eveningShift.id)}</span>}
                                   </div>;
                                 })}
                                 {note&&<div style={{fontSize:9,color:"#1e293b",marginTop:3,borderTop:"0.5px solid #e2e8f0",paddingTop:2}}>{note}</div>}
@@ -1419,6 +1427,7 @@ export default function App() {
                                   onMouseEnter={()=>setHoveredEmp(id)}
                                   onMouseLeave={()=>setHoveredEmp(null)}>
                                   <span style={{fontSize:12,fontWeight:isHovered?"700":"500",color:"#0369a1",display:"block"}}>{emp?.name}</span>
+                                  {getEmpShiftNote(id,date,morningShift?.id||shift?.id)&&<span style={{fontSize:9,color:"#475569",display:"block",fontStyle:"italic"}}>{getEmpShiftNote(id,date,morningShift?.id||shift?.id)}</span>}
                                 </div>;
                               })}
                               {frMorning.length>0&&phAll.length>0&&<div style={{height:1,background:"#e2e8f0",margin:"3px 0"}}></div>}
@@ -1635,6 +1644,13 @@ export default function App() {
                                       onMouseLeave={()=>setHoveredEmp(null)}>
                                       ✓ {emp?.name}
                                     </button>
+                                    <input
+                                      style={{width:"100%",fontSize:9,padding:"2px 4px",border:"1px solid #e2e8f0",borderRadius:4,color:"#475569",background:"#f8fafc",marginTop:1,boxSizing:"border-box"}}
+                                      placeholder="הערה לעובד..."
+                                      value={getEmpShiftNote(id,date,shift.id)}
+                                      onChange={e=>setEmpShiftNote(id,date,shift.id,e.target.value)}
+                                      onClick={e=>e.stopPropagation()}
+                                    />
                                   );
                                 })}
                               </div>
