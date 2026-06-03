@@ -739,7 +739,7 @@ export default function App() {
       date: formatDateShort(date),
       dayObj: date,
     }));
-    const colW = Math.floor((1600-120)/7);
+    const colW = Math.floor((1600-120-64)/7); // 64px for 32px padding each side
     const empCell = (emps, note) => {
       let h="";
       emps.forEach((emp,j)=>{
@@ -1045,7 +1045,7 @@ export default function App() {
                 },{passive:true});
                 el.addEventListener('touchend',()=>{lastDist=null;},{passive:true});
               }}>
-                <table style={{borderCollapse:"collapse",fontSize:11,minWidth:600,background:"#fff"}}>
+                <table style={{borderCollapse:"collapse",fontSize:14,minWidth:700,background:"#fff"}}>
                   <thead>
                     <tr style={{background:"#1D9E75",color:"#fff"}}>
                       <th style={{padding:"8px 8px",border:"0.5px solid #0F6E56",width:52,textAlign:"center",fontSize:10,fontWeight:"500",position:"sticky",right:0,background:"#1D9E75",zIndex:2}}></th>
@@ -1054,8 +1054,8 @@ export default function App() {
                         const isPast=midnight<new Date();
                         return (
                           <th key={dateKey(date)} style={{padding:"9px 6px",border:"0.5px solid #0F6E56",textAlign:"center",minWidth:90,opacity:isPast?0.5:1}}>
-                            <div style={{fontSize:13,fontWeight:"700"}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
-                            <div style={{fontSize:13,fontWeight:"700",color:"#E1F5EE",marginTop:2}}>{formatDateShort(date)}</div>
+                            <div style={{fontSize:15,fontWeight:"800"}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
+                            <div style={{fontSize:14,fontWeight:"800",color:"#E1F5EE",marginTop:2}}>{formatDateShort(date)}</div>
                           </th>
                         );
                       })}
@@ -1092,15 +1092,15 @@ export default function App() {
                         ];
                         const shiftNote=ms?getShiftNote(date,ms.id):"";
                         return (
-                          <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:isPast?"#edf0f4":"#fff",cursor:allEmps.length?"pointer":"default",minWidth:90}}
+                          <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:isPast?"#edf0f4":"#fff",cursor:allEmps.length?"pointer":"default",minWidth:100}}
                             onClick={()=>allEmps.length&&ms&&openShiftModal("☀️ משמרת בוקר",date,ms,["רוקח","פרח"])}>
                             {allEmps.map(({id,sh,label})=>{
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
-                                <span style={{fontSize:13,fontWeight:isMe?"700":"600",color:isMe?"#1d4ed8":"#334155",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
+                                <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
+                                <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
                                 {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                               </div>;
                             })}
@@ -1130,15 +1130,15 @@ export default function App() {
                         ];
                         const shiftNote=getShiftNote(date,es.id);
                         return (
-                          <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:isPast?"#edf0f4":"#fff",cursor:allEmps.length?"pointer":"default",minWidth:90}}
+                          <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:isPast?"#edf0f4":"#fff",cursor:allEmps.length?"pointer":"default",minWidth:100}}
                             onClick={()=>allEmps.length&&openShiftModal("🌙 משמרת ערב",date,es,["רוקח","פרח"])}>
                             {allEmps.map(({id,sh})=>{
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
-                                <span style={{fontSize:13,fontWeight:isMe?"700":"600",color:isMe?"#1d4ed8":"#334155",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}</span>
+                                <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
+                                <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}</span>
                                 {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                               </div>;
                             })}
@@ -1159,7 +1159,7 @@ export default function App() {
                   onClick={async()=>{
                     const {default:h2c} = await import("https://esm.sh/html2canvas@1.4.1");
                     const container = document.createElement("div");
-                    container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;";
+                    container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#f8fafc;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;padding:32px;";
                     container.innerHTML = buildImageHTML();
                     document.body.appendChild(container);
                     await new Promise(r=>setTimeout(r,200));
@@ -1178,7 +1178,7 @@ export default function App() {
                   onClick={async()=>{
                     const {default:h2c} = await import("https://esm.sh/html2canvas@1.4.1");
                     const container = document.createElement("div");
-                    container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;";
+                    container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#f8fafc;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;padding:32px;";
                     container.innerHTML = buildImageHTML();
                     document.body.appendChild(container);
                     await new Promise(r=>setTimeout(r,200));
@@ -1307,7 +1307,7 @@ export default function App() {
                       if(!shifts.length) return null;
                       return (
                         <th key={dateKey(date)} style={{background:"#f8fafc",padding:"8px 4px",border:"0.5px solid #e2e8f0",textAlign:"center",color:"#1e293b"}}>
-                          <div style={{fontSize:13,fontWeight:"700"}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
+                          <div style={{fontSize:15,fontWeight:"800"}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
                           <div style={{fontSize:12,color:"#475569",fontWeight:"600",marginTop:1}}>{formatDateShort(date)}</div>
                         </th>
                       );
@@ -1722,14 +1722,14 @@ export default function App() {
               },{passive:true});
               el.addEventListener('touchend',()=>{last=null;},{passive:true});
             }}>
-              <table style={{borderCollapse:"collapse",fontSize:11,minWidth:580,background:"#fff"}}>
+              <table style={{borderCollapse:"collapse",fontSize:14,minWidth:700,background:"#fff"}}>
                 <thead>
                   <tr style={{background:"#1D9E75",color:"#fff"}}>
                     <th style={{padding:"9px 6px",border:"0.5px solid #0F6E56",width:52,textAlign:"center",fontSize:10,fontWeight:"500",position:"sticky",right:0,background:"#1D9E75",zIndex:2}}></th>
                     {weekDates.map(date=>(
                       <th key={dateKey(date)} style={{padding:"9px 6px",border:"0.5px solid #0F6E56",textAlign:"center",minWidth:90,whiteSpace:"nowrap"}}>
-                        <div style={{fontSize:13,fontWeight:"700"}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
-                        <div style={{fontSize:13,fontWeight:"700",color:"#E1F5EE",marginTop:2}}>{formatDateShort(date)}</div>
+                        <div style={{fontSize:15,fontWeight:"800"}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
+                        <div style={{fontSize:14,fontWeight:"800",color:"#E1F5EE",marginTop:2}}>{formatDateShort(date)}</div>
                       </th>
                     ))}
                   </tr>
@@ -1762,7 +1762,7 @@ export default function App() {
                         ...(ms?getAssigned(date,ms.id,"פרח").map(id=>({id,sh:ms})):[]),
                       ];
                       const note=ms?getShiftNote(date,ms.id):"";
-                      return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff",minWidth:90}}>
+                      return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff",minWidth:100}}>
                         {allEmps.map(({id,sh,label},i)=>{
                           const emp=employees.find(e=>e.id===id);
                           const isHov=hoveredEmp===id;
@@ -1771,8 +1771,8 @@ export default function App() {
                             {i>0&&allEmps[i-1].sh.id!==sh.id&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
                               onClick={()=>setHoveredEmp(hoveredEmp===id?null:id)}>
-                              <span className="sim-name" style={{fontSize:13,fontWeight:"600",color:"#334155",display:"block"}}>{emp?.name}</span>
-                              <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
+                              <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:"#1e293b",display:"block"}}>{emp?.name}</span>
+                              <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
                               {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
@@ -1799,7 +1799,7 @@ export default function App() {
                         ...getAssigned(date,es.id,"פרח").map(id=>({id,sh:es})),
                       ];
                       const note=getShiftNote(date,es.id);
-                      return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff",minWidth:90}}>
+                      return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff",minWidth:100}}>
                         {allEmps.map(({id,sh},i)=>{
                           const emp=employees.find(e=>e.id===id);
                           const isHov=hoveredEmp===id;
@@ -1808,8 +1808,8 @@ export default function App() {
                             {i>0&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
                               onClick={()=>setHoveredEmp(hoveredEmp===id?null:id)}>
-                              <span className="sim-name" style={{fontSize:13,fontWeight:"600",color:"#334155",display:"block"}}>{emp?.name}</span>
-                              <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}</span>
+                              <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:"#1e293b",display:"block"}}>{emp?.name}</span>
+                              <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}</span>
                               {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
@@ -1829,7 +1829,7 @@ export default function App() {
                 onClick={async()=>{
                   const {default:h2c} = await import("https://esm.sh/html2canvas@1.4.1");
                   const container = document.createElement("div");
-                  container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;";
+                  container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#f8fafc;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;padding:32px;";
                   container.innerHTML = buildImageHTML();
                   document.body.appendChild(container);
                   await new Promise(r=>setTimeout(r,200));
@@ -1848,7 +1848,7 @@ export default function App() {
                 onClick={async()=>{
                   const {default:h2c} = await import("https://esm.sh/html2canvas@1.4.1");
                   const container = document.createElement("div");
-                  container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;";
+                  container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#f8fafc;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;padding:32px;";
                   container.innerHTML = buildImageHTML();
                   document.body.appendChild(container);
                   await new Promise(r=>setTimeout(r,200));
@@ -2075,7 +2075,7 @@ export default function App() {
                       const wrap = document.getElementById("mgr-sched-capture");
                       if(!wrap){showToast("גלול לסימולציה תחילה","err");return;}
                       const container = document.createElement("div");
-                      container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;";
+                      container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#f8fafc;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;padding:32px;";
                       container.innerHTML = buildImageHTML();
                       document.body.appendChild(container);
                       await new Promise(r=>setTimeout(r,200));
@@ -2093,7 +2093,7 @@ export default function App() {
                     onClick={async()=>{
                       const {default:h2c} = await import("https://esm.sh/html2canvas@1.4.1");
                       const container = document.createElement("div");
-                      container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#fff;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;";
+                      container.style.cssText="position:absolute;top:0;left:-9999px;width:1600px;background:#f8fafc;font-family:Segoe UI,Tahoma,sans-serif;direction:rtl;padding:32px;";
                       container.innerHTML = buildImageHTML();
                       document.body.appendChild(container);
                       await new Promise(r=>setTimeout(r,200));
@@ -2387,7 +2387,7 @@ export default function App() {
               ))}
               <div style={{marginTop:10,display:"flex",gap:6,flexWrap:"wrap"}}>
                 <input style={{...S.input,flex:2,minWidth:120}} placeholder="שם" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&newEmpName.trim()&&(setEmployees(prev=>[...prev,{id:Date.now(),name:newEmpName.trim(),role:newEmpRole,phone:""}]),setNewEmpName(""))} />
-                <select style={{...S.input,flex:1,minWidth:90}} value={newEmpRole} onChange={e=>setNewEmpRole(e.target.value)}>
+                <select style={{...S.input,flex:1,minWidth:100}} value={newEmpRole} onChange={e=>setNewEmpRole(e.target.value)}>
                   {ROLES.map(r=><option key={r} value={r}>{r}</option>)}
                 </select>
                 <input style={{...S.input,flex:1,minWidth:100}} placeholder="טלפון" value={newEmpPhone} onChange={e=>setNewEmpPhone(e.target.value)} />
