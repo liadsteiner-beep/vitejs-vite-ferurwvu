@@ -325,7 +325,7 @@ export default function App() {
   const [newRotaOpen, setNewRotaOpen] = useState("");
   const [newRotaClose, setNewRotaClose] = useState("");
   const [empTab, setEmpTab] = useState(published ? "schedule" : "avail");
-  const [schedView, setSchedView] = useState("list"); // list | table
+  const [schedView, setSchedView] = useState("list"); // unused — kept for compatibility
   const [shiftModal, setShiftModal] = useState(null); // {title, date, shiftNote, emps[]}
   // Vacation request form state (employee)
   const [vacType, setVacType] = useState("יום בודד");
@@ -1137,96 +1137,140 @@ export default function App() {
             );
           })()}
 
-          {/* Mobile schedule — list + table view */}
+          {/* Mobile schedule — single scrollable table */}
           {empTab==="schedule" && published && (
             <div style={{marginTop:4}}>
-              {/* View toggle */}
-              <div style={{display:"flex",gap:6,marginBottom:10}}>
-                <button style={{padding:"5px 12px",border:`1.5px ${schedView==="list"?"solid":"dashed"} #1e293b`,borderRadius:7,background:schedView==="list"?"#1e293b":"transparent",color:schedView==="list"?"#fff":"#64748b",fontSize:11,cursor:"pointer",fontWeight:"500"}} onClick={()=>setSchedView("list")}>☰ רשימה</button>
-                <button style={{padding:"5px 12px",border:`1.5px ${schedView==="table"?"solid":"dashed"} #1e293b`,borderRadius:7,background:schedView==="table"?"#1e293b":"transparent",color:schedView==="table"?"#fff":"#64748b",fontSize:11,cursor:"pointer"}} onClick={()=>setSchedView("table")}>⊞ טבלה</button>
-              </div>
-
-              {/* LIST */}
-              {schedView==="list" && weekDates.map(date=>{
-                const ds=DAY_SHIFTS[date.getDay()]||[];
-                const ms=ds.find(s=>["morning","open"].includes(s.id));
-                const cs=ds.find(s=>s.id==="close");
-                const es=ds.find(s=>s.id==="evening");
-                const remarks=getRemarks(date);
-                const phM=ms?getAssigned(date,ms.id,"רוקח"):[];
-                const phC=cs?getAssigned(date,cs.id,"רוקח"):[];
-                const frM=ms?getAssigned(date,ms.id,"פרח"):[];
-                const phE=es?getAssigned(date,es.id,"רוקח"):[];
-                const frE=es?getAssigned(date,es.id,"פרח"):[];
-                const hasMorning=phM.length||phC.length||frM.length;
-                const hasEvening=phE.length||frE.length;
-                if(!hasMorning&&!hasEvening) return null;
-                const chip=(id,sh)=>{const emp=employees.find(e=>e.id===id);const isMe=id===currentUser.id;const n=getEmpShiftNote(id,date,sh?.id);return <div key={id} style={{display:"inline-block",borderRadius:6,padding:"3px 8px",margin:"2px",background:isMe?"#dbeafe":"#f1f5f9",border:isMe?"1.5px solid #3b82f6":"1px solid #e2e8f0"}}>
-                  <span style={{fontSize:12,fontWeight:isMe?"700":"500",color:isMe?"#1d4ed8":"#475569",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                  <span style={{fontSize:9,color:"#64748b",display:"block"}}>{sh?.time}</span>
-                  {n&&<span style={{fontSize:9,color:"#475569",fontStyle:"italic",display:"block"}}>{n}</span>}
-                </div>;};
-                return (
-                  <div key={dateKey(date)} style={{...S.card,marginBottom:8,padding:"10px 12px"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                      <div style={{fontWeight:"700",fontSize:13,color:"#1e293b"}}>{formatDate(date)}</div>
-                      {remarks.length>0&&<span style={{fontSize:10,border:"1px solid #1e293b",borderRadius:4,padding:"1px 6px"}}>{remarks.join(" | ")}</span>}
-                    </div>
-                    {hasMorning&&<div style={{background:"#fafafa",borderRadius:8,padding:"8px 10px",marginBottom:6,borderRight:"3px solid #22c55e",cursor:"pointer"}} onClick={()=>ms&&openShiftModal("☀️ משמרת בוקר",date,ms,["רוקח","פרח"])}>
-                      <div style={{fontSize:11,color:"#64748b",fontWeight:"500",marginBottom:5,display:"flex",justifyContent:"space-between"}}><span>☀️ בוקר</span><span style={{fontSize:9,color:"#94a3b8"}}>לפרטים ›</span></div>
-                      <div>{[...phM.map(id=>chip(id,ms)),...phC.map(id=>chip(id,cs)),...frM.map(id=>chip(id,ms))]}</div>
-                      {ms&&getShiftNote(date,ms.id)&&<div style={{fontSize:10,color:"#1e293b",marginTop:4,fontStyle:"italic"}}>{getShiftNote(date,ms.id)}</div>}
-                    </div>}
-                    {hasEvening&&<div style={{background:"#fafafa",borderRadius:8,padding:"8px 10px",borderRight:"3px solid #6366f1",cursor:"pointer"}} onClick={()=>es&&openShiftModal("🌙 משמרת ערב",date,es,["רוקח","פרח"])}>
-                      <div style={{fontSize:11,color:"#64748b",fontWeight:"500",marginBottom:5,display:"flex",justifyContent:"space-between"}}><span>🌙 ערב</span><span style={{fontSize:9,color:"#94a3b8"}}>לפרטים ›</span></div>
-                      <div>{[...phE.map(id=>chip(id,es)),...frE.map(id=>chip(id,es))]}</div>
-                      {es&&getShiftNote(date,es.id)&&<div style={{fontSize:10,color:"#1e293b",marginTop:4,fontStyle:"italic"}}>{getShiftNote(date,es.id)}</div>}
-                    </div>}
-                  </div>
-                );
-              })}
-
-              {/* TABLE */}
-              {schedView==="table" && (
-                <div style={{overflowX:"auto"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,tableLayout:"fixed",minWidth:380}}>
-                    <thead>
-                      <tr style={{background:"#1e293b",color:"#e2e8f0"}}>
-                        <th style={{padding:"7px 4px",border:"0.5px solid #334155",width:54,textAlign:"center",fontSize:10,fontWeight:"500"}}></th>
-                        {weekDates.map(date=>(
-                          <th key={dateKey(date)} style={{padding:"7px 4px",border:"0.5px solid #334155",textAlign:"center",fontSize:10,fontWeight:"500"}}>
-                            <div>{date.toLocaleDateString("he-IL",{weekday:"narrow"})}</div>
-                            <div style={{fontSize:9,opacity:0.6,marginTop:1}}>{formatDateShort(date)}</div>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[{matchIds:["morning","open"],label:"☀️ בוקר",color:"#22c55e"},{matchIds:["evening"],label:"🌙 ערב",color:"#6366f1"}].map((group,gi)=>(
-                        <tr key={gi} style={{borderBottom:gi===0?"3px solid #1e293b":"none"}}>
-                          <td style={{background:"#f8fafc",padding:"6px 3px",textAlign:"center",border:"0.5px solid #e2e8f0",fontSize:10,fontWeight:"500",color:"#475569",borderRight:`3px solid ${group.color}`}}>{group.label}</td>
-                          {weekDates.map(date=>{
-                            const shifts=(DAY_SHIFTS[date.getDay()]||[]).filter(s=>group.matchIds.includes(s.id));
-                            if(!shifts.length) return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",background:"#f8fafc",textAlign:"center",color:"#d1d5db",fontSize:10}}>—</td>;
-                            const allEmps=shifts.flatMap(sh=>[...getAssigned(date,sh.id,"רוקח").map(id=>({id,sh})),...getAssigned(date,sh.id,"פרח").map(id=>({id,sh}))]);
-                            const firstShift=shifts[0];
-                            const titleLabel=group.matchIds.includes("morning")||group.matchIds.includes("open")?"☀️ משמרת בוקר":"🌙 משמרת ערב";
-                            return (
-                              <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:"3px 2px",verticalAlign:"top",background:"#fff",cursor:allEmps.length?"pointer":"default"}}
-                                onClick={()=>allEmps.length&&firstShift&&openShiftModal(titleLabel,date,firstShift,["רוקח","פרח"])}>
-                                {allEmps.map(({id,sh})=>{const emp=employees.find(e=>e.id===id);const isMe=id===currentUser.id;return <div key={id} style={{padding:"1px 2px",borderRadius:3,background:isMe?"#dbeafe":"transparent",marginBottom:1,textAlign:"center"}}>
-                                  <span style={{fontSize:10,fontWeight:isMe?"700":"400",color:isMe?"#1d4ed8":"#475569"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                </div>;})}
-                                {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <style>{`
+                @keyframes rotSpin { 0%,100%{transform:rotate(0deg)} 40%{transform:rotate(90deg)} 60%{transform:rotate(90deg)} }
+                .sched-rotate-tip { display:flex; }
+                .sched-scroll-wrap { overflow-x:auto; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08); touch-action:pan-x pan-y pinch-zoom; }
+                @media (orientation: landscape) {
+                  .sched-rotate-tip { display:none !important; }
+                  .sched-scroll-wrap { overflow-x:visible; }
+                  .sched-scroll-wrap table { min-width:unset !important; width:100%; }
+                }
+              `}</style>
+              {/* Rotate tip */}
+              <div className="sched-rotate-tip" style={{alignItems:"center",gap:8,background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
+                <span style={{fontSize:20,display:"inline-block",animation:"rotSpin 2s ease-in-out infinite"}}>🔄</span>
+                <div>
+                  <div style={{fontSize:12,fontWeight:"500",color:"#0369a1"}}>סובב למסך מלא</div>
+                  <div style={{fontSize:11,color:"#64748b"}}>או צבוט להקטנה / הגדלה</div>
                 </div>
-              )}
+              </div>
+              <div style={{fontSize:11,color:"#94a3b8",marginBottom:6,textAlign:"center"}}>← גלול לראות את כל השבוע</div>
+              <div className="sched-scroll-wrap" ref={el=>{
+                if(!el||el._pz) return; el._pz=true;
+                let scale=1,lastDist=null;
+                el.addEventListener('touchstart',e=>{if(e.touches.length===2)lastDist=null;},{passive:true});
+                el.addEventListener('touchmove',e=>{
+                  if(e.touches.length!==2)return;
+                  const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
+                  const dist=Math.sqrt(dx*dx+dy*dy);
+                  if(lastDist){scale*=dist/lastDist;scale=Math.max(0.4,Math.min(2,scale));el.style.transform=`scale(${scale})`;el.style.transformOrigin='top right';}
+                  lastDist=dist;
+                },{passive:true});
+                el.addEventListener('touchend',()=>{lastDist=null;},{passive:true});
+              }}>
+                <table style={{borderCollapse:"collapse",fontSize:11,minWidth:600,background:"#fff"}}>
+                  <thead>
+                    <tr style={{background:"#1e293b",color:"#e2e8f0"}}>
+                      <th style={{padding:"8px 8px",border:"0.5px solid #334155",width:72,textAlign:"center",fontSize:10,fontWeight:"500",position:"sticky",right:0,background:"#1e293b",zIndex:2}}></th>
+                      {weekDates.map(date=>(
+                        <th key={dateKey(date)} style={{padding:"8px 6px",border:"0.5px solid #334155",textAlign:"center",minWidth:90}}>
+                          <div style={{fontSize:12,fontWeight:"600"}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
+                          <div style={{fontSize:11,color:"#94a3b8",fontWeight:"400",marginTop:1}}>{formatDateShort(date)}</div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* הערות יום */}
+                    <tr>
+                      <td style={{background:"#f8fafc",padding:"3px 6px",borderRight:"3px solid #1e293b",border:"0.5px solid #e2e8f0",fontSize:9,color:"#475569",textAlign:"center",position:"sticky",right:0,zIndex:1}}>📌</td>
+                      {weekDates.map(date=>{
+                        const remarks=getRemarks(date);
+                        return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:3,background:"#fff",textAlign:"center"}}>
+                          {remarks.length>0&&<span style={{display:"inline-block",border:"1.5px solid #1e293b",borderRadius:4,padding:"1px 4px",fontSize:9,fontWeight:"500",color:"#1e293b",width:"100%"}}>{remarks.join(" | ")}</span>}
+                        </td>;
+                      })}
+                    </tr>
+                    {/* בוקר */}
+                    <tr>
+                      <td style={{background:"#f8fafc",padding:"8px 4px",borderRight:"3px solid #22c55e",border:"0.5px solid #e2e8f0",textAlign:"center",verticalAlign:"middle",position:"sticky",right:0,zIndex:1}}>
+                        <span style={{fontSize:14}}>☀️</span>
+                        <span style={{display:"block",fontSize:10,fontWeight:"500",color:"#1e293b"}}>בוקר</span>
+                      </td>
+                      {weekDates.map(date=>{
+                        const ds=DAY_SHIFTS[date.getDay()]||[];
+                        const ms=ds.find(s=>["morning","open"].includes(s.id));
+                        const cs=ds.find(s=>s.id==="close");
+                        if(!ms&&!cs) return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",background:"#f8fafc",textAlign:"center",color:"#d1d5db",fontSize:10}}>—</td>;
+                        const allEmps=[
+                          ...(ms?getAssigned(date,ms.id,"רוקח").map(id=>({id,sh:ms})):[]),
+                          ...(cs?getAssigned(date,cs.id,"רוקח").map(id=>({id,sh:cs,label:"סגירה"})):[]),
+                          ...(ms?getAssigned(date,ms.id,"פרח").map(id=>({id,sh:ms})):[]),
+                        ];
+                        const shiftNote=ms?getShiftNote(date,ms.id):"";
+                        return (
+                          <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff",cursor:allEmps.length?"pointer":"default",minWidth:90}}
+                            onClick={()=>allEmps.length&&ms&&openShiftModal("☀️ משמרת בוקר",date,ms,["רוקח","פרח"])}>
+                            {allEmps.map(({id,sh,label})=>{
+                              const emp=employees.find(e=>e.id===id);
+                              const isMe=id===currentUser.id;
+                              const n=getEmpShiftNote(id,date,sh.id);
+                              return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?"#dbeafe":"transparent",marginBottom:2}}>
+                                <span style={{fontSize:12,fontWeight:isMe?"700":"500",color:isMe?"#1d4ed8":"#475569",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
+                                <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
+                                {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
+                              </div>;
+                            })}
+                            {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
+                            {shiftNote&&allEmps.length>0&&<div style={{fontSize:8,color:"#92400e",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginTop:2}}>{shiftNote}</div>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    {/* פס */}
+                    <tr><td colSpan={weekDates.length+1} style={{background:"#1e293b",height:4,padding:0,border:"none"}}></td></tr>
+                    {/* ערב */}
+                    <tr>
+                      <td style={{background:"#f8fafc",padding:"8px 4px",borderRight:"3px solid #6366f1",border:"0.5px solid #e2e8f0",textAlign:"center",verticalAlign:"middle",position:"sticky",right:0,zIndex:1}}>
+                        <span style={{fontSize:14}}>🌙</span>
+                        <span style={{display:"block",fontSize:10,fontWeight:"500",color:"#1e293b"}}>ערב</span>
+                      </td>
+                      {weekDates.map(date=>{
+                        const ds=DAY_SHIFTS[date.getDay()]||[];
+                        const es=ds.find(s=>s.id==="evening");
+                        if(!es) return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",background:"#f8fafc",textAlign:"center",color:"#d1d5db",fontSize:10}}>—</td>;
+                        const allEmps=[
+                          ...getAssigned(date,es.id,"רוקח").map(id=>({id,sh:es})),
+                          ...getAssigned(date,es.id,"פרח").map(id=>({id,sh:es})),
+                        ];
+                        const shiftNote=getShiftNote(date,es.id);
+                        return (
+                          <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff",cursor:allEmps.length?"pointer":"default",minWidth:90}}
+                            onClick={()=>allEmps.length&&openShiftModal("🌙 משמרת ערב",date,es,["רוקח","פרח"])}>
+                            {allEmps.map(({id,sh})=>{
+                              const emp=employees.find(e=>e.id===id);
+                              const isMe=id===currentUser.id;
+                              const n=getEmpShiftNote(id,date,sh.id);
+                              return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?"#dbeafe":"transparent",marginBottom:2}}>
+                                <span style={{fontSize:12,fontWeight:isMe?"700":"500",color:isMe?"#1d4ed8":"#475569",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
+                                <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}</span>
+                                {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
+                              </div>;
+                            })}
+                            {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
+                            {shiftNote&&allEmps.length>0&&<div style={{fontSize:8,color:"#92400e",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginTop:2}}>{shiftNote}</div>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style={{fontSize:10,color:"#94a3b8",textAlign:"center",marginTop:6}}>לחצי על משמרת לפרטים מלאים</div>
             </div>
           )}
           {(empTab==="avail" || !published) && (
