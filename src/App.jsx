@@ -1039,17 +1039,17 @@ export default function App() {
                   );
                 }) : <div style={{...S.card,color:"#94a3b8",fontSize:13}}>לא שובצת השבוע</div>}
                 <div style={{...S.card,padding:0,overflow:"hidden"}}>
-                  <div style={{background:"#1e293b",padding:"8px 12px",display:"flex",justifyContent:"space-between"}}>
+                  <div style={{background:"#1D9E75",padding:"8px 12px",display:"flex",justifyContent:"space-between"}}>
                     <span style={{color:"#f8fafc",fontWeight:"500",fontSize:13}}>💊 סידור עבודה</span>
                     <span style={{color:"#22c55e",fontSize:11}}>✓ פורסם</span>
                   </div>
                   <div style={{overflowX:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,tableLayout:"fixed"}}>
                       <thead>
-                        <tr style={{background:"#1e293b",color:"#e2e8f0"}}>
-                          <th style={{padding:"7px 6px",width:72,border:"0.5px solid #334155"}}></th>
+                        <tr style={{background:"#1D9E75",color:"#fff"}}>
+                          <th style={{padding:"7px 6px",width:72,border:"0.5px solid #0F6E56"}}></th>
                           {weekDates.map(date=>(
-                            <th key={dateKey(date)} style={{padding:"7px 4px",textAlign:"center",fontWeight:"500",fontSize:13,border:"0.5px solid #334155"}}>
+                            <th key={dateKey(date)} style={{padding:"7px 4px",textAlign:"center",fontWeight:"500",fontSize:13,border:"0.5px solid #0F6E56"}}>
                               <div>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
                               <div style={{fontSize:11,color:"#94a3b8",fontWeight:"400",marginTop:1}}>{formatDateShort(date)}</div>
                             </th>
@@ -1184,13 +1184,13 @@ export default function App() {
               }}>
                 <table style={{borderCollapse:"collapse",fontSize:11,minWidth:600,background:"#fff"}}>
                   <thead>
-                    <tr style={{background:"#1e293b",color:"#e2e8f0"}}>
-                      <th style={{padding:"8px 8px",border:"0.5px solid #334155",width:72,textAlign:"center",fontSize:10,fontWeight:"500",position:"sticky",right:0,background:"#1e293b",zIndex:2}}></th>
+                    <tr style={{background:"#1D9E75",color:"#fff"}}>
+                      <th style={{padding:"8px 8px",border:"0.5px solid #0F6E56",width:72,textAlign:"center",fontSize:10,fontWeight:"500",position:"sticky",right:0,background:"#1D9E75",zIndex:2}}></th>
                       {weekDates.map(date=>{
                         const midnight=new Date(date); midnight.setHours(23,59,59,0);
                         const isPast=midnight<new Date();
                         return (
-                          <th key={dateKey(date)} style={{padding:"8px 6px",border:"0.5px solid #334155",textAlign:"center",minWidth:90,opacity:isPast?0.5:1}}>
+                          <th key={dateKey(date)} style={{padding:"8px 6px",border:"0.5px solid #0F6E56",textAlign:"center",minWidth:90,opacity:isPast?0.5:1}}>
                             <div style={{fontSize:12,fontWeight:"600"}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
                             <div style={{fontSize:11,color:"#94a3b8",fontWeight:"400",marginTop:1}}>{formatDateShort(date)}</div>
                           </th>
@@ -1236,7 +1236,7 @@ export default function App() {
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
-                                <span style={{fontSize:12,fontWeight:isMe?"700":"500",color:isMe?"#1d4ed8":"#475569",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
+                                <span style={{fontSize:13,fontWeight:isMe?"700":"600",color:isMe?"#1d4ed8":"#334155",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
                                 <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
                                 {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                               </div>;
@@ -1274,7 +1274,7 @@ export default function App() {
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
-                                <span style={{fontSize:12,fontWeight:isMe?"700":"500",color:isMe?"#1d4ed8":"#475569",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
+                                <span style={{fontSize:13,fontWeight:isMe?"700":"600",color:isMe?"#1d4ed8":"#334155",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
                                 <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}</span>
                                 {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                               </div>;
@@ -1720,10 +1720,10 @@ export default function App() {
             }}>
               <table style={{borderCollapse:"collapse",fontSize:11,minWidth:580,background:"#fff"}}>
                 <thead>
-                  <tr style={{background:"#1e293b",color:"#e2e8f0"}}>
-                    <th style={{padding:"9px 6px",border:"0.5px solid #334155",width:68,textAlign:"center",fontSize:10,fontWeight:"500",position:"sticky",right:0,background:"#1e293b",zIndex:2}}></th>
+                  <tr style={{background:"#1D9E75",color:"#fff"}}>
+                    <th style={{padding:"9px 6px",border:"0.5px solid #0F6E56",width:68,textAlign:"center",fontSize:10,fontWeight:"500",position:"sticky",right:0,background:"#1D9E75",zIndex:2}}></th>
                     {weekDates.map(date=>(
-                      <th key={dateKey(date)} style={{padding:"9px 6px",border:"0.5px solid #334155",textAlign:"center",minWidth:90,whiteSpace:"nowrap"}}>
+                      <th key={dateKey(date)} style={{padding:"9px 6px",border:"0.5px solid #0F6E56",textAlign:"center",minWidth:90,whiteSpace:"nowrap"}}>
                         <div style={{fontSize:12,fontWeight:"600"}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
                         <div style={{fontSize:11,color:"#94a3b8",fontWeight:"400",marginTop:1}}>{formatDateShort(date)}</div>
                       </th>
@@ -1767,7 +1767,7 @@ export default function App() {
                             {i>0&&allEmps[i-1].sh.id!==sh.id&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
                               onClick={()=>setHoveredEmp(hoveredEmp===id?null:id)}>
-                              <span className="sim-name" style={{fontSize:12,fontWeight:"500",color:"#475569",display:"block"}}>{emp?.name}</span>
+                              <span className="sim-name" style={{fontSize:13,fontWeight:"600",color:"#334155",display:"block"}}>{emp?.name}</span>
                               <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
                               {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
@@ -1804,7 +1804,7 @@ export default function App() {
                             {i>0&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
                               onClick={()=>setHoveredEmp(hoveredEmp===id?null:id)}>
-                              <span className="sim-name" style={{fontSize:12,fontWeight:"500",color:"#475569",display:"block"}}>{emp?.name}</span>
+                              <span className="sim-name" style={{fontSize:13,fontWeight:"600",color:"#334155",display:"block"}}>{emp?.name}</span>
                               <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}</span>
                               {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
@@ -1847,7 +1847,7 @@ export default function App() {
               <table id="assign-table" style={{width:"100%",borderCollapse:"collapse",fontSize:12,background:"#fff",borderRadius:12,overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.08)",minWidth:500}}>
                 <thead>
                   <tr style={{background:"#1e293b",color:"#f8fafc"}}>
-                    <th style={{padding:"8px",textAlign:"right",fontWeight:"600",minWidth:80,fontSize:11}}>משמרת</th>
+                    <th style={{padding:"8px",textAlign:"right",fontWeight:"600",minWidth:80,fontSize:11,border:"0.5px solid #0F6E56"}}>משמרת</th>
                     {weekDates.map(date=>(
                       <th key={dateKey(date)} style={{padding:"8px 4px",textAlign:"center",fontWeight:"600",minWidth:80}}>
                         <div style={{fontSize:11}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
@@ -2371,5 +2371,3 @@ export default function App() {
     );
   }
 }
-
-
