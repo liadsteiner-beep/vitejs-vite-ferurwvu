@@ -962,8 +962,18 @@ export default function App() {
             });
             const moodIdx = total > 0 ? Math.round((doneSoFar / total) * (MOOD_EMOJIS.length - 1)) : 0;
             const moodEmoji = total > 0 ? MOOD_EMOJIS[moodIdx] : "😏";
-            const encouragements = ["השבוע מתחיל — בהצלחה!","יאללה, התחלה טובה!","מצוין, ממשיכים!","כבר באמצע 💪","כמעט שם! 🎉","עשית את זה! 🌟","עשית את זה! 🌟"];
-            const encourage = encouragements[Math.min(doneSoFar, encouragements.length-1)];
+            const ENCOURAGEMENTS = {
+              0: ["השבוע עוד לא התחיל... הקפה מוכן? ☕"],
+              1: ["משמרת אחת — כבר התחלת! הכי קשה זה להתחיל 💪"],
+              2: ["שתיים מאחוריך — קדימה! 💨"],
+              3: ["חצי דרך — את/ה עושה את זה! 💪","שלוש! הכי קשה מאחוריך 🙌","3 מ-5, לא רע בכלל 😎"],
+              4: ["עוד אחת ואת/ה שם! 🏁","ארבע! המשמרת האחרונה מחכה לך 👊","אפשר לראות את הסוף","אחת נשארה — היא לא מפחידה אותך 😤"],
+              5: ["סיימת! שבוע מושלם, כל הכבוד! 🎉","עשית את זה! אלופ/ה! 💊","שבוע שלם מאחוריך — מגיע/ה לך מנוחה 🛋️","5 מתוך 5 — מקצוען/ית! ⭐"],
+            };
+            const encPool = ENCOURAGEMENTS[Math.min(doneSoFar, 5)] || ENCOURAGEMENTS[5];
+            // Pick random based on week number for variety
+            const weekSeed = weekDates[0]?.getDate() || 0;
+            const encourage = encPool[weekSeed % encPool.length];
             const isMe = id => id === currentUser.id;
             return (
               <div style={{marginBottom:12}}>
@@ -1012,16 +1022,16 @@ export default function App() {
                   const isToday = now >= startDate && now <= endDate;
                   const empNote = getEmpShiftNote(currentUser.id,date,sh.id);
                   return (
-                    <div key={i} style={{...S.card,opacity:isDone?0.55:1,border:isToday?"1.5px solid #378ADD":"1px solid #e2e8f0",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
-                      <div style={{width:36,height:36,borderRadius:8,background:["morning","open"].includes(sh.id)?"#FAEEDA":"#EEEDFE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{shiftIcon}</div>
+                    <div key={i} style={{...S.card,opacity:isDone?0.6:1,border:isDone?"1.5px solid #22c55e":isToday?"1.5px solid #378ADD":"1px solid #e2e8f0",marginBottom:8,display:"flex",alignItems:"center",gap:12,background:isDone?"#f0fdf4":"#fff"}}>
+                      <div style={{width:36,height:36,borderRadius:8,background:isDone?"#dcfce7":["morning","open"].includes(sh.id)?"#FAEEDA":"#EEEDFE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:isDone?22:18,flexShrink:0}}>{isDone?"✓":shiftIcon}</div>
                       <div style={{flex:1}}>
-                        <div style={{fontSize:13,fontWeight:"500",color:"#1e293b"}}>{date.toLocaleDateString("he-IL",{weekday:"long"})} — {shiftLabel}</div>
-                        <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{sh.time}</div>
+                        <div style={{fontSize:13,fontWeight:"500",color:isDone?"#15803d":"#1e293b"}}>{date.toLocaleDateString("he-IL",{weekday:"long"})} — {shiftLabel}</div>
+                        <div style={{fontSize:11,color:isDone?"#16a34a":"#64748b",marginTop:1}}>{sh.time}</div>
                         {empNote&&<div style={{fontSize:11,color:"#64748b",fontStyle:"italic",marginTop:2}}>{empNote}</div>}
                       </div>
                       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                         <span style={{fontSize:18}}>{MOOD_EMOJIS[Math.round((i/(Math.max(total-1,1)))*(MOOD_EMOJIS.length-1))]}</span>
-                        <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:"500",background:isDone?"#EAF3DE":isToday?"#E6F1FB":"#f1f5f9",color:isDone?"#3B6D11":isToday?"#185FA5":"#94a3b8"}}>
+                        <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:"600",background:isDone?"#dcfce7":isToday?"#E6F1FB":"#f1f5f9",color:isDone?"#15803d":isToday?"#185FA5":"#94a3b8",border:isDone?"1.5px solid #22c55e":"none"}}>
                           {isDone?"✓ הסתיים":isToday?"היום":"בקרוב"}
                         </span>
                       </div>
@@ -1176,12 +1186,16 @@ export default function App() {
                   <thead>
                     <tr style={{background:"#1e293b",color:"#e2e8f0"}}>
                       <th style={{padding:"8px 8px",border:"0.5px solid #334155",width:72,textAlign:"center",fontSize:10,fontWeight:"500",position:"sticky",right:0,background:"#1e293b",zIndex:2}}></th>
-                      {weekDates.map(date=>(
-                        <th key={dateKey(date)} style={{padding:"8px 6px",border:"0.5px solid #334155",textAlign:"center",minWidth:90}}>
-                          <div style={{fontSize:12,fontWeight:"600"}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
-                          <div style={{fontSize:11,color:"#94a3b8",fontWeight:"400",marginTop:1}}>{formatDateShort(date)}</div>
-                        </th>
-                      ))}
+                      {weekDates.map(date=>{
+                        const midnight=new Date(date); midnight.setHours(23,59,59,0);
+                        const isPast=midnight<new Date();
+                        return (
+                          <th key={dateKey(date)} style={{padding:"8px 6px",border:"0.5px solid #334155",textAlign:"center",minWidth:90,opacity:isPast?0.5:1}}>
+                            <div style={{fontSize:12,fontWeight:"600"}}>{date.toLocaleDateString("he-IL",{weekday:"short"})}</div>
+                            <div style={{fontSize:11,color:"#94a3b8",fontWeight:"400",marginTop:1}}>{formatDateShort(date)}</div>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -1205,7 +1219,9 @@ export default function App() {
                         const ds=DAY_SHIFTS[date.getDay()]||[];
                         const ms=ds.find(s=>["morning","open"].includes(s.id));
                         const cs=ds.find(s=>s.id==="close");
-                        if(!ms&&!cs) return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",background:"#f8fafc",textAlign:"center",color:"#d1d5db",fontSize:10}}>—</td>;
+                        const midnight=new Date(date); midnight.setHours(23,59,59,0);
+                        const isPast=midnight<new Date();
+                        if(!ms&&!cs) return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",background:isPast?"#edf0f4":"#f8fafc",textAlign:"center",color:"#d1d5db",fontSize:10}}>—</td>;
                         const allEmps=[
                           ...(ms?getAssigned(date,ms.id,"רוקח").map(id=>({id,sh:ms})):[]),
                           ...(cs?getAssigned(date,cs.id,"רוקח").map(id=>({id,sh:cs,label:"סגירה"})):[]),
@@ -1213,13 +1229,13 @@ export default function App() {
                         ];
                         const shiftNote=ms?getShiftNote(date,ms.id):"";
                         return (
-                          <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff",cursor:allEmps.length?"pointer":"default",minWidth:90}}
+                          <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:isPast?"#edf0f4":"#fff",cursor:allEmps.length?"pointer":"default",minWidth:90}}
                             onClick={()=>allEmps.length&&ms&&openShiftModal("☀️ משמרת בוקר",date,ms,["רוקח","פרח"])}>
                             {allEmps.map(({id,sh,label})=>{
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
-                              return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?"#dbeafe":"transparent",marginBottom:2}}>
+                              return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:12,fontWeight:isMe?"700":"500",color:isMe?"#1d4ed8":"#475569",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
                                 <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
                                 {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
@@ -1242,20 +1258,22 @@ export default function App() {
                       {weekDates.map(date=>{
                         const ds=DAY_SHIFTS[date.getDay()]||[];
                         const es=ds.find(s=>s.id==="evening");
-                        if(!es) return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",background:"#f8fafc",textAlign:"center",color:"#d1d5db",fontSize:10}}>—</td>;
+                        const midnight=new Date(date); midnight.setHours(23,59,59,0);
+                        const isPast=midnight<new Date();
+                        if(!es) return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",background:isPast?"#edf0f4":"#f8fafc",textAlign:"center",color:"#d1d5db",fontSize:10}}>—</td>;
                         const allEmps=[
                           ...getAssigned(date,es.id,"רוקח").map(id=>({id,sh:es})),
                           ...getAssigned(date,es.id,"פרח").map(id=>({id,sh:es})),
                         ];
                         const shiftNote=getShiftNote(date,es.id);
                         return (
-                          <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:"#fff",cursor:allEmps.length?"pointer":"default",minWidth:90}}
+                          <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:isPast?"#edf0f4":"#fff",cursor:allEmps.length?"pointer":"default",minWidth:90}}
                             onClick={()=>allEmps.length&&openShiftModal("🌙 משמרת ערב",date,es,["רוקח","פרח"])}>
                             {allEmps.map(({id,sh})=>{
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
-                              return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?"#dbeafe":"transparent",marginBottom:2}}>
+                              return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:12,fontWeight:isMe?"700":"500",color:isMe?"#1d4ed8":"#475569",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
                                 <span style={{fontSize:8,color:"#94a3b8",display:"block"}}>{sh.time}</span>
                                 {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
