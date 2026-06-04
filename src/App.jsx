@@ -1026,9 +1026,7 @@ export default function App() {
 
 
           {/* Mobile schedule — single scrollable table */}
-          {empTab==="schedule" && published && (()=>{
-            const displayDates = empDisplayDates;
-            return (
+          {empTab==="schedule" && published && (
             <div style={{marginTop:4}}>
               {!showNextWeek && (
                 <div style={{fontSize:12,color:"#64748b",marginBottom:8,fontWeight:"500"}}>
@@ -1072,7 +1070,7 @@ export default function App() {
                   <thead>
                     <tr style={{background:"#1D9E75",color:"#fff"}}>
                       <th style={{padding:"8px 8px",border:"0.5px solid #0F6E56",width:46,textAlign:"center",fontSize:10,fontWeight:"500",position:"sticky",left:0,background:"#1D9E75",zIndex:2}}></th>
-                      {displayDates.map(date=>{
+                      {empDisplayDates.map(date=>{
                         const midnight=new Date(date); midnight.setHours(23,59,59,0);
                         const isPast=midnight<new Date();
                         return (
@@ -1088,7 +1086,7 @@ export default function App() {
                     {/* הערות יום */}
                     <tr>
                       <td style={{background:"#f8fafc",padding:"3px 6px",borderLeft:"3px solid #1e293b",border:"0.5px solid #e2e8f0",fontSize:9,color:"#475569",textAlign:"center",position:"sticky",left:0,zIndex:1}}>📌</td>
-                      {displayDates.map(date=>{
+                      {empDisplayDates.map(date=>{
                         const remarks=getRemarks(date);
                         return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:3,background:"#fff",textAlign:"center"}}>
                           {remarks.length>0&&<span style={{display:"inline-block",border:"1.5px solid #1e293b",borderRadius:4,padding:"1px 4px",fontSize:9,fontWeight:"500",color:"#1e293b",width:"100%"}}>{remarks.join(" | ")}</span>}
@@ -1101,7 +1099,7 @@ export default function App() {
                         <span style={{fontSize:16}}>☀️</span>
                         <span style={{display:"block",fontSize:11,fontWeight:"700",color:"#15803d",marginTop:2}}>בוקר</span>
                       </td>
-                      {displayDates.map(date=>{
+                      {empDisplayDates.map(date=>{
                         const ds=DAY_SHIFTS[date.getDay()]||[];
                         const ms=ds.find(s=>["morning","open"].includes(s.id));
                         const cs=ds.find(s=>s.id==="close");
@@ -1134,14 +1132,14 @@ export default function App() {
                       })}
                     </tr>
                     {/* פס */}
-                    <tr><td colSpan={displayDates.length+1} style={{background:"#1e293b",height:4,padding:0,border:"none"}}></td></tr>
+                    <tr><td colSpan={empDisplayDates.length+1} style={{background:"#1e293b",height:4,padding:0,border:"none"}}></td></tr>
                     {/* ערב */}
                     <tr>
                       <td style={{background:"#f5f3ff",padding:"6px 3px",borderLeft:"3px solid #6366f1",border:"0.5px solid #e2e8f0",textAlign:"center",verticalAlign:"middle",position:"sticky",left:0,zIndex:1}}>
                         <span style={{fontSize:16}}>🌙</span>
                         <span style={{display:"block",fontSize:11,fontWeight:"700",color:"#4338ca",marginTop:2}}>ערב</span>
                       </td>
-                      {displayDates.map(date=>{
+                      {empDisplayDates.map(date=>{
                         const ds=DAY_SHIFTS[date.getDay()]||[];
                         const es=ds.find(s=>s.id==="evening");
                         const midnight=new Date(date); midnight.setHours(23,59,59,0);
@@ -1189,7 +1187,7 @@ export default function App() {
                     const canvas = await h2c(container,{scale:2,useCORS:true,backgroundColor:"#fff",width:1584,windowWidth:1584});
                     document.body.removeChild(container);
                     const link = document.createElement("a");
-                    link.download = `סידור ${formatDateShort(displayDates[0])}-${formatDateShort(displayDates[6])}.png`;
+                    link.download = `סידור ${formatDateShort(empDisplayDates[0])}-${formatDateShort(empDisplayDates[6])}.png`;
                     link.href = canvas.toDataURL("image/png");
                     link.click();
                     showToast("הסידור נשמר ✓");
@@ -1212,7 +1210,7 @@ export default function App() {
                       if(navigator.share&&navigator.canShare({files:[file]})){
                         await navigator.share({files:[file],title:"סידור עבודה"});
                       } else {
-                        window.open(`https://wa.me/?text=${encodeURIComponent("סידור עבודה "+formatDateShort(displayDates[0])+" - "+formatDateShort(displayDates[6]))}`,"_blank");
+                        window.open(`https://wa.me/?text=${encodeURIComponent("סידור עבודה "+formatDateShort(empDisplayDates[0])+" - "+formatDateShort(empDisplayDates[6]))}`,"_blank");
                       }
                     });
                   }}>
@@ -1314,8 +1312,7 @@ export default function App() {
                 );
               })()}
             </div>
-            );
-          })()}
+          )}
           {(empTab==="avail" || !published) && (
           <div>
           {/* Availability selection — weekly grid */}
