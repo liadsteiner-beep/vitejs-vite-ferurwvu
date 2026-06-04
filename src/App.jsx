@@ -315,7 +315,7 @@ export default function App() {
   const [sendMode, setSendMode] = useState("personal");
   // ברירת מחדל: offset 0 = שבוע נוכחי
   // אם הסידור פורסם לשבוע הבא — מתחיל ב-offset 0 (עובד יראה שבוע נוכחי + אפשרות לשבוע הבא)
-  const [weekOffset, setWeekOffset] = useState(0);
+  const [weekOffset, setWeekOffset] = useState(1); // 1 = שבוע הבא
   const [vacations, setVacations] = useState({});
   // Friday rota form state
   const [newRotaDate, setNewRotaDate] = useState("");
@@ -339,12 +339,6 @@ export default function App() {
   const currentRealWeekDates = getWeekDates(0);
   const nextWeekDates = getWeekDates(1);
   const nextWeekPublished = published;
-  const currentWeekHasData = weekDates.some(date =>
-    (DAY_SHIFTS[date.getDay()]||[]).some(sh =>
-      getAssigned(date,sh.id,"רוקח").length > 0 || getAssigned(date,sh.id,"פרח").length > 0
-    )
-  );
-  const empDisplayDates = showNextWeek ? nextWeekDates : ((!currentWeekHasData && nextWeekPublished) ? nextWeekDates : weekDates);
   const [dayRemarks, setDayRemarks] = useState({}); // dateKey -> ["הורדת מבצע", ...]
   const [shiftNotes, setShiftNotes] = useState({}); // dateKey_shiftId -> string
   const [empShiftNotes, setEmpShiftNotes] = useState({}); // empId_dateKey_shiftId -> string
@@ -577,6 +571,9 @@ export default function App() {
   // ── ASSIGN ──
   const aKey      = (date,shiftId,role) => `${dateKey(date)}_${shiftId}_${role}`;
   const getAssigned = (date,shiftId,role) => assigned[aKey(date,shiftId,role)]||[];
+
+  // empDisplayDates — show next week if nextWeekPublished and showNextWeek, else weekDates
+  const empDisplayDates = showNextWeek && nextWeekPublished ? nextWeekDates : weekDates;
 
   function toggleAssign(date,shiftId,role,empId) {
     const k = aKey(date,shiftId,role);
