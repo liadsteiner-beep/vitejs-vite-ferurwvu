@@ -64,15 +64,19 @@ const INITIAL_EMPLOYEES = [
 
 // Day shift templates: dayOfWeek (0=Sun) -> shifts
 const DAY_SHIFTS = {
-  0: [ { id:"morning", label:"בוקר", time:"08:00-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב", time:"14:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
-  1: [ { id:"morning", label:"בוקר", time:"08:00-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב", time:"14:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
-  2: [ { id:"morning", label:"בוקר", time:"08:00-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב", time:"14:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
-  3: [ { id:"morning", label:"בוקר", time:"08:00-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב", time:"14:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
-  4: [ { id:"morning", label:"בוקר", time:"08:00-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב", time:"14:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
-  5: [ { id:"open",    label:"פתיחה", time:"08:00-14:00", slots:{"רוקח":1,"פרח":1} }, { id:"close", label:"סגירה", time:"14:00-20:00", slots:{"רוקח":1,"פרח":0} } ],
-  6: [ { id:"morning", label:"בוקר שבת", time:"09:00-15:00", slots:{"רוקח":1,"פרח":0} }, { id:"evening", label:"ערב שבת", time:"15:00-21:00", slots:{"רוקח":1,"פרח":1} } ],
+  0: [ { id:"morning", label:"בוקר", time:"08:30-16:00", timeFrach:"09:30-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב", time:"16:00-23:00", timeFrach:"16:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
+  1: [ { id:"morning", label:"בוקר", time:"08:30-16:00", timeFrach:"09:30-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב", time:"16:00-23:00", timeFrach:"16:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
+  2: [ { id:"morning", label:"בוקר", time:"08:30-16:00", timeFrach:"09:30-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב", time:"16:00-23:00", timeFrach:"16:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
+  3: [ { id:"morning", label:"בוקר", time:"08:30-16:00", timeFrach:"09:30-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב", time:"16:00-23:00", timeFrach:"16:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
+  4: [ { id:"morning", label:"בוקר", time:"08:30-16:00", timeFrach:"09:30-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב", time:"16:00-23:00", timeFrach:"16:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
+  5: [ { id:"open",    label:"פתיחה", time:"08:00-14:00", timeFrach:"09:30-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"close", label:"סגירה", time:"14:00-20:00", timeFrach:"14:00-20:00", slots:{"רוקח":1,"פרח":0} } ],
+  6: [ { id:"morning", label:"בוקר שבת", time:"10:00-16:30", timeFrach:"10:00-16:30", slots:{"רוקח":1,"פרח":0} }, { id:"evening", label:"ערב שבת", time:"16:30-23:00", timeFrach:"18:00-23:00", slots:{"רוקח":1,"פרח":1} } ],
 };
 const SESSION_KEY = "pharmacy_session_v1";
+// Returns correct shift time based on role
+function getShiftTime(sh, role) {
+  return role === "פרח" && sh.timeFrach ? sh.timeFrach : sh.time;
+}
 function saveSession(user) { try { localStorage.setItem(SESSION_KEY, JSON.stringify(user)); } catch {} }
 function loadSession() { try { const r = localStorage.getItem(SESSION_KEY); return r ? JSON.parse(r) : null; } catch { return null; } }
 function clearSession() { try { localStorage.removeItem(SESSION_KEY); } catch {} }
@@ -622,7 +626,7 @@ export default function App() {
         if (!emp) return;
         emps.push({
           id, name: emp.name, role,
-          time: shift.time,
+          time: getShiftTime(shift, role),
           label: shift.id==="open"?"פתיחה":shift.id==="close"?"סגירה":"",
           isMe: id === currentUser?.id,
           note: getEmpShiftNote(id, date, shift.id),
@@ -800,7 +804,7 @@ export default function App() {
       const emps = [
         ...(ms ? getAssigned(dayObj,ms.id,"רוקח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:ms.time,note:getEmpShiftNote(id,dayObj,ms.id)})) : []),
         ...(cs ? getAssigned(dayObj,cs.id,"רוקח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:cs.time,label:"סגירה",note:getEmpShiftNote(id,dayObj,cs.id)})) : []),
-        ...(ms ? getAssigned(dayObj,ms.id,"פרח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:ms.time,note:getEmpShiftNote(id,dayObj,ms.id)})) : []),
+        ...(ms ? getAssigned(dayObj,ms.id,"פרח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:getShiftTime(ms,"פרח"),note:getEmpShiftNote(id,dayObj,ms.id)})) : []),
       ];
       html += shiftCell(emps, ms ? getShiftNote(dayObj,ms.id) : "");
     });
@@ -821,7 +825,7 @@ export default function App() {
       if (!es) { html += `<td style="border:0.5px solid #e2e8f0;background:#f8fafc;text-align:center;color:#d1d5db;font-size:28px;vertical-align:middle;">—</td>`; return; }
       const emps = [
         ...getAssigned(dayObj,es.id,"רוקח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:es.time,note:getEmpShiftNote(id,dayObj,es.id)})),
-        ...getAssigned(dayObj,es.id,"פרח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:es.time,note:getEmpShiftNote(id,dayObj,es.id)})),
+        ...getAssigned(dayObj,es.id,"פרח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:getShiftTime(es,"פרח"),note:getEmpShiftNote(id,dayObj,es.id)})),
       ];
       html += shiftCell(emps, getShiftNote(dayObj,es.id));
     });
@@ -860,7 +864,8 @@ export default function App() {
 
   function openWhatsApp(phone, text) {
     const num = phone.replace(/\D/g,"");
-    window.open(`https://wa.me/${num.startsWith("0")?`972${num.slice(1)}`:num}?text=${encodeURIComponent(text)}`,"_blank");
+    const phone = num.startsWith("0") ? `972${num.slice(1)}` : num;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank");
   }
 
   function sendGroupReminder() {
@@ -1130,21 +1135,21 @@ export default function App() {
                         const isPast=midnight<new Date();
                         if(!ms&&!cs) return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",background:isPast?"#edf0f4":"#f8fafc",textAlign:"center",color:"#d1d5db",fontSize:10}}>—</td>;
                         const allEmps=[
-                          ...(ms?getAssigned(date,ms.id,"רוקח").map(id=>({id,sh:ms})):[]),
-                          ...(cs?getAssigned(date,cs.id,"רוקח").map(id=>({id,sh:cs,label:"סגירה"})):[]),
-                          ...(ms?getAssigned(date,ms.id,"פרח").map(id=>({id,sh:ms})):[]),
+                          ...(ms?getAssigned(date,ms.id,"רוקח").map(id=>({id,sh:ms,role:"רוקח"})):[]),
+                          ...(cs?getAssigned(date,cs.id,"רוקח").map(id=>({id,sh:cs,label:"סגירה",role:"רוקח"})):[]),
+                          ...(ms?getAssigned(date,ms.id,"פרח").map(id=>({id,sh:ms,role:"פרח"})):[]),
                         ];
                         const shiftNote=ms?getShiftNote(date,ms.id):"";
                         return (
                           <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:isPast?"#edf0f4":"#fff",cursor:allEmps.length?"pointer":"default"}}
                             onClick={()=>allEmps.length&&ms&&openShiftModal("☀️ משמרת בוקר",date,ms,["רוקח","פרח"])}>
-                            {allEmps.map(({id,sh,label})=>{
+                            {allEmps.map(({id,sh,label,role})=>{
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{sh.time}{label?` ${label}`:""}</span>
+                                <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role)}{label?` ${label}`:""}</span>
                                 {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1,whiteSpace:"nowrap"}}>{n}</span>}
                               </div>;
                             })}
@@ -1169,20 +1174,20 @@ export default function App() {
                         const isPast=midnight<new Date();
                         if(!es) return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",background:isPast?"#edf0f4":"#f8fafc",textAlign:"center",color:"#d1d5db",fontSize:10}}>—</td>;
                         const allEmps=[
-                          ...getAssigned(date,es.id,"רוקח").map(id=>({id,sh:es})),
-                          ...getAssigned(date,es.id,"פרח").map(id=>({id,sh:es})),
+                          ...getAssigned(date,es.id,"רוקח").map(id=>({id,sh:es,role:"רוקח"})),
+                          ...getAssigned(date,es.id,"פרח").map(id=>({id,sh:es,role:"פרח"})),
                         ];
                         const shiftNote=getShiftNote(date,es.id);
                         return (
                           <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:4,verticalAlign:"top",background:isPast?"#edf0f4":"#fff",cursor:allEmps.length?"pointer":"default"}}
                             onClick={()=>allEmps.length&&openShiftModal("🌙 משמרת ערב",date,es,["רוקח","פרח"])}>
-                            {allEmps.map(({id,sh})=>{
+                            {allEmps.map(({id,sh,role})=>{
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{sh.time}</span>
+                                <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role)}</span>
                                 {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                               </div>;
                             })}
@@ -1291,7 +1296,7 @@ export default function App() {
                           <div style={{width:42,height:42,borderRadius:10,background:isDone?"#dcfce7":["morning","open"].includes(sh.id)?"#FAEEDA":"#EEEDFE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:isDone?26:22,flexShrink:0}}>{isDone?"✓":shiftIcon}</div>
                           <div style={{flex:1}}>
                             <div style={{fontSize:15,fontWeight:"700",color:isDone?"#15803d":"#1e293b"}}>{date.toLocaleDateString("he-IL",{weekday:"long"})} — {shiftLabel}</div>
-                            <div style={{fontSize:13,color:isDone?"#16a34a":"#475569",fontWeight:"500",marginTop:2}}>{sh.time}</div>
+                            <div style={{fontSize:13,color:isDone?"#16a34a":"#475569",fontWeight:"500",marginTop:2}}>{getShiftTime(sh, myRole)}</div>
                             {empNote&&<div style={{fontSize:11,color:"#64748b",fontStyle:"italic",marginTop:2}}>{empNote}</div>}
                           </div>
                           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
