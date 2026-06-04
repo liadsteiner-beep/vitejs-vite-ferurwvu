@@ -335,37 +335,16 @@ export default function App() {
   const [manualVacStart, setManualVacStart] = useState("");
   const [manualVacEnd, setManualVacEnd] = useState("");
   const [manualVacNote, setManualVacNote] = useState("");
-  // For employee view: current week = this actual week (Sunday to Saturday)
-  const weekDates = getWeekDates(weekOffset); // שבוע לפי offset (0 = נוכחי)
-  const currentRealWeekDates = getWeekDates(0); // שבוע נוכחי
-  const nextWeekDates = getWeekDates(1); // שבוע הבא
-
-  // nextWeekPublished: if schedule is published, assume it's for next week
+  const weekDates = getWeekDates(weekOffset);
+  const currentRealWeekDates = getWeekDates(0);
+  const nextWeekDates = getWeekDates(1);
   const nextWeekPublished = published;
-
-  // empDisplayDates: אם מציגים שבוע הבא — nextWeekDates, אחרת weekDates
-  // אבל אם weekDates ריק ויש נתונים ב-nextWeekDates — הצג nextWeekDates כברירת מחדל
   const currentWeekHasData = weekDates.some(date =>
     (DAY_SHIFTS[date.getDay()]||[]).some(sh =>
       getAssigned(date,sh.id,"רוקח").length > 0 || getAssigned(date,sh.id,"פרח").length > 0
     )
   );
   const empDisplayDates = showNextWeek ? nextWeekDates : ((!currentWeekHasData && nextWeekPublished) ? nextWeekDates : weekDates);
-  // nextWeekDates = week offset 1 from current
-  const nextWeekDates = getWeekDates(1);
-  // next week published — true if publishedWeekStart matches next week's Sunday
-  // nextWeekPublished: published week (weekDates) is after current real week
-  const nextWeekPublished = (() => {
-    if (!published) return false;
-    // If publishedWeekStart exists, use it; otherwise use weekDates[0]
-    const pubSunday = publishedWeekStart ? new Date(publishedWeekStart) : new Date(weekDates[0]);
-    pubSunday.setHours(0,0,0,0);
-    const curSat = new Date(currentRealWeekDates[6]);
-    curSat.setHours(23,59,59,0);
-    return pubSunday > curSat;
-  })();
-  // Debug: log comparison
-  if (published && !currentUser?.isManager) console.log('[DEBUG] publishedWeekStart:', publishedWeekStart, '| nextWeekDates[0]:', dateKey(nextWeekDates[0]), '| nextWeekPublished:', nextWeekPublished);
   const [dayRemarks, setDayRemarks] = useState({}); // dateKey -> ["הורדת מבצע", ...]
   const [shiftNotes, setShiftNotes] = useState({}); // dateKey_shiftId -> string
   const [empShiftNotes, setEmpShiftNotes] = useState({}); // empId_dateKey_shiftId -> string
