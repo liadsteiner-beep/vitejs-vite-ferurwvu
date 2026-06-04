@@ -313,7 +313,9 @@ export default function App() {
   const [fbLoaded, setFbLoaded] = useState(false);
   const [showAutoConfirm, setShowAutoConfirm] = useState(false);
   const [sendMode, setSendMode] = useState("personal");
-  const [weekOffset, setWeekOffset] = useState(0); // 0 = שבוע נוכחי תמיד
+  // ברירת מחדל: offset 0 = שבוע נוכחי
+  // אם הסידור פורסם לשבוע הבא — מתחיל ב-offset 0 (עובד יראה שבוע נוכחי + אפשרות לשבוע הבא)
+  const [weekOffset, setWeekOffset] = useState(0);
   const [vacations, setVacations] = useState({});
   // Friday rota form state
   const [newRotaDate, setNewRotaDate] = useState("");
@@ -341,7 +343,14 @@ export default function App() {
   // nextWeekPublished: if schedule is published, assume it's for next week
   const nextWeekPublished = published;
 
-  const empDisplayDates = showNextWeek ? nextWeekDates : weekDates;
+  // empDisplayDates: אם מציגים שבוע הבא — nextWeekDates, אחרת weekDates
+  // אבל אם weekDates ריק ויש נתונים ב-nextWeekDates — הצג nextWeekDates כברירת מחדל
+  const currentWeekHasData = weekDates.some(date =>
+    (DAY_SHIFTS[date.getDay()]||[]).some(sh =>
+      getAssigned(date,sh.id,"רוקח").length > 0 || getAssigned(date,sh.id,"פרח").length > 0
+    )
+  );
+  const empDisplayDates = showNextWeek ? nextWeekDates : ((!currentWeekHasData && nextWeekPublished) ? nextWeekDates : weekDates);
   // nextWeekDates = week offset 1 from current
   const nextWeekDates = getWeekDates(1);
   // next week published — true if publishedWeekStart matches next week's Sunday
