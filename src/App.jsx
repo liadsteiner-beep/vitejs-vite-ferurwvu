@@ -90,21 +90,18 @@ function saveData(d) {
 // - Before publish: next week (Sun after this week)
 // - After publish: week after next
 // - Thu/Fri/Sat: always one week further
-function getSchedulingWeekStart(offsetWeeks = 0, isPublished = false) {
+function getSchedulingWeekStart(offsetWeeks = 0) {
   const today = new Date();
-  const day = today.getDay(); // 0=Sun ... 6=Sat
-  // Go to the most recent Sunday (start of current week)
+  const day = today.getDay(); // 0=Sun
   const sunday = new Date(today);
-  sunday.setDate(today.getDate() - day);
+  sunday.setDate(today.getDate() - day); // current week's Sunday
   sunday.setHours(0, 0, 0, 0);
-  // Add offset weeks (0 = current week, 1 = next week, etc.)
-  const publishedExtra = isPublished ? 1 : 0;
-  sunday.setDate(sunday.getDate() + (publishedExtra + offsetWeeks) * 7);
+  sunday.setDate(sunday.getDate() + offsetWeeks * 7);
   return sunday;
 }
 
-function getWeekDates(offsetWeeks = 0, isPublished = false) {
-  const sunday = getSchedulingWeekStart(offsetWeeks, isPublished);
+function getWeekDates(offsetWeeks = 0) {
+  const sunday = getSchedulingWeekStart(offsetWeeks);
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(sunday);
     d.setDate(sunday.getDate() + i);
@@ -316,16 +313,7 @@ export default function App() {
   const [fbLoaded, setFbLoaded] = useState(false);
   const [showAutoConfirm, setShowAutoConfirm] = useState(false);
   const [sendMode, setSendMode] = useState("personal");
-  // ברירת מחדל: לפני יום ראשון של השבוע הבא — הצג שבוע נוכחי (offset 0)
-  // מיום ראשון ואילך — הצג שבוע הבא (offset 1)
-  const defaultWeekOffset = (() => {
-    const today = new Date();
-    const day = today.getDay(); // 0=ראשון
-    // offset 0 = השבוע שמתחיל ב-Sunday האחרון שעבר
-    // נציג offset 1 רק מיום ראשון (day===0)
-    return day === 0 ? 1 : 0;
-  })();
-  const [weekOffset, setWeekOffset] = useState(defaultWeekOffset);
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = שבוע נוכחי תמיד
   const [vacations, setVacations] = useState({});
   // Friday rota form state
   const [newRotaDate, setNewRotaDate] = useState("");
@@ -346,40 +334,38 @@ export default function App() {
   const [manualVacEnd, setManualVacEnd] = useState("");
   const [manualVacNote, setManualVacNote] = useState("");
   // For employee view: current week = this actual week (Sunday to Saturday)
-  function getCurrentWeekDates() {
-    const today = new Date();
-    const day = today.getDay(); // 0=Sun
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() - day); // go back to this week's Sunday
-    sunday.setHours(0,0,0,0);
-    return Array.from({length:7},(_,i)=>{ const d=new Date(sunday); d.setDate(sunday.getDate()+i); return d; });
-  }
-  const weekDates = getWeekDates(weekOffset, false); // תמיד מציג את שבוע הסידור הנוכחי
-  const currentRealWeekDates = getCurrentWeekDates(); // השבוע האמיתי הנוכחי לעובד
-  // nextWeekDates = the published week (if exists) or the week after current
-  const nextWeekDates = (() => {
-    if (publishedWeekStart) {
-      const sunday = new Date(publishedWeekStart);
-      sunday.setHours(0,0,0,0);
-      return Array.from({length:7},(_,i)=>{ const d=new Date(sunday); d.setDate(sunday.getDate()+i); return d; });
-    }
-    // fallback: next week from current
+  const weekDates = getWeekDates(weekOffset); // שבוע לפי offset (0 = נוכחי)
+  const currentRealWeekDates = getWeekDates(0); // שבוע נוכחי
+  const nextWeekDates = getWeekDates(1); // שבוע הבא
+
+  // nextWeekPublished: published=true AND published week is next week
+  const nextWeekPublished = (() => {
+    if (!published) return false;
+    const pubSunday = publishedWeekStart ? new Date(publishedWeekStart) : new Date(weekDates[0]);
+    pubSunday.setHours(0,0,0,0);
+    const curSat = new Date(currentRealWeekDates[6]);
+    curSat.setHours(23,59,59,0);
+    return pubSunday > curSat;
+  })();
+
+  const empDisplayDates = showNextWeek ? nextWeekDates : weekDates;
+  // nextWeekDates = weekDates (what manager published) when it's after current week, else week after current
+  const nextWeekDates = nextWeekPublished ? weekDates : (() => {
     const nextSunday = new Date(currentRealWeekDates[6]);
     nextSunday.setDate(nextSunday.getDate() + 1);
     nextSunday.setHours(0,0,0,0);
     return Array.from({length:7},(_,i)=>{ const d=new Date(nextSunday); d.setDate(nextSunday.getDate()+i); return d; });
   })();
   // next week published — true if publishedWeekStart matches next week's Sunday
+  // nextWeekPublished: published week (weekDates) is after current real week
   const nextWeekPublished = (() => {
-    if (!published || !publishedWeekStart) return false;
-    // publishedWeekStart is the Sunday of the published week (ISO string)
-    // currentRealWeekDates[6] is Saturday of current week
-    // If published week starts AFTER current week's Saturday → it's next week or later
-    const pubDate = new Date(publishedWeekStart);
-    pubDate.setHours(0,0,0,0);
+    if (!published) return false;
+    // If publishedWeekStart exists, use it; otherwise use weekDates[0]
+    const pubSunday = publishedWeekStart ? new Date(publishedWeekStart) : new Date(weekDates[0]);
+    pubSunday.setHours(0,0,0,0);
     const curSat = new Date(currentRealWeekDates[6]);
-    curSat.setHours(0,0,0,0);
-    return pubDate > curSat; // published week is after current week
+    curSat.setHours(23,59,59,0);
+    return pubSunday > curSat;
   })();
   // Debug: log comparison
   if (published && !currentUser?.isManager) console.log('[DEBUG] publishedWeekStart:', publishedWeekStart, '| nextWeekDates[0]:', dateKey(nextWeekDates[0]), '| nextWeekPublished:', nextWeekPublished);
@@ -1008,13 +994,11 @@ export default function App() {
         <div style={S.main}>
           <div style={{marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
-              <div style={{fontWeight:"800",fontSize:16}}>📅 שבוע {formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}</div>
-              <div style={{display:"flex",alignItems:"center",gap:6,background:"#f1f5f9",borderRadius:"8px",padding:"3px 8px"}}>
-                <button style={{background:"none",border:"none",color:"#1e293b",cursor:"pointer",fontSize:16,padding:"0 4px"}} onClick={()=>setWeekOffset(w=>w-1)}>הקודם</button>
-                <span style={{fontSize:11,color:"#64748b",minWidth:60,textAlign:"center"}}>
-                  {weekOffset===0?"הבא":weekOffset===1?"שבועיים":`+${weekOffset+1} שבועות`}
-                </span>
-                <button style={{background:"none",border:"none",color:"#1e293b",cursor:"pointer",fontSize:16,padding:"0 4px"}} onClick={()=>setWeekOffset(w=>w+1)}>הבא</button>
+              <div style={{fontWeight:"800",fontSize:16}}>📅 שבוע {formatDateShort(empDisplayDates[0])} – {formatDateShort(empDisplayDates[6])}</div>
+              <div style={{display:"flex",alignItems:"center",gap:4,background:"#f1f5f9",borderRadius:"8px",padding:"3px 6px"}}>
+                <button style={{background:"none",border:"none",color:"#1e293b",cursor:"pointer",fontSize:13,fontWeight:"600",padding:"0 4px"}} onClick={()=>setWeekOffset(w=>Math.max(0,w-1))}>הקודם</button>
+                <span style={{fontSize:11,color:"#cbd5e1"}}>|</span>
+                <button style={{background:"none",border:"none",color:"#1e293b",cursor:"pointer",fontSize:13,fontWeight:"600",padding:"0 4px"}} onClick={()=>setWeekOffset(w=>w+1)}>הבא</button>
               </div>
             </div>
             <div style={{color:"#64748b",fontSize:12,marginTop:3}}>
@@ -1035,10 +1019,14 @@ export default function App() {
 
           {/* Mobile schedule — single scrollable table */}
           {empTab==="schedule" && published && (()=>{
-            const displayDates = showNextWeek ? nextWeekDates : currentRealWeekDates;
+            const displayDates = empDisplayDates;
             return (
             <div style={{marginTop:4}}>
-              {/* Next week banner */}
+              {!showNextWeek && (
+                <div style={{fontSize:12,color:"#64748b",marginBottom:8,fontWeight:"500"}}>
+                  📅 מציג: {formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}
+                </div>
+              )}
               {!showNextWeek && nextWeekPublished && (
                 <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10,cursor:"pointer"}} onClick={()=>setShowNextWeek(true)}>
                   <div>
@@ -1058,8 +1046,8 @@ export default function App() {
               )}
               {showNextWeek && (
                 <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                  <span style={{fontSize:12,fontWeight:"600",color:"#15803d"}}>שבוע {formatDateShort(nextWeekDates[0])} – {formatDateShort(nextWeekDates[6])}</span>
-                  <button style={{fontSize:13,border:"none",background:"none",color:"#64748b",cursor:"pointer",textDecoration:"underline"}} onClick={()=>setShowNextWeek(false)}>‹ חזור לשבוע הנוכחי</button>
+                  <span style={{fontSize:13,fontWeight:"600",color:"#15803d"}}>📅 {formatDateShort(nextWeekDates[0])} – {formatDateShort(nextWeekDates[6])}</span>
+                  <button style={{fontSize:13,border:"none",background:"none",color:"#64748b",cursor:"pointer",textDecoration:"underline"}} onClick={()=>setShowNextWeek(false)}>‹ חזור ל-{formatDateShort(weekDates[0])}</button>
                 </div>
               )}
               <style>{`
