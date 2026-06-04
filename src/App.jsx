@@ -315,7 +315,8 @@ export default function App() {
   const [sendMode, setSendMode] = useState("personal");
   // ברירת מחדל: offset 0 = שבוע נוכחי
   // אם הסידור פורסם לשבוע הבא — מתחיל ב-offset 0 (עובד יראה שבוע נוכחי + אפשרות לשבוע הבא)
-  const [weekOffset, setWeekOffset] = useState(1); // 1 = שבוע הבא
+  // ברירת מחדל: ראשון–שלישי = שבוע נוכחי (0), רביעי–שבת = שבוע הבא (1)
+  const [weekOffset, setWeekOffset] = useState(new Date().getDay() >= 4 ? 1 : 0);
   const [vacations, setVacations] = useState({});
   // Friday rota form state
   const [newRotaDate, setNewRotaDate] = useState("");
@@ -349,6 +350,9 @@ export default function App() {
   const [changePwErr, setChangePwErr]     = useState("");
   const [hoveredEmp, setHoveredEmp] = useState(null);
   const dragRef = useRef(null); // {empId, date, shiftId, role}
+  const lastEmpClickRef = useRef({id:null, time:0, date:null, sh:null}); // for double-click
+  const [scheduleChanged, setScheduleChanged] = useState(false); // alert for employee
+  const [showChangeModal, setShowChangeModal] = useState(false);
 
   // Enable pinch-to-zoom on the whole page
   useEffect(() => {
@@ -406,6 +410,16 @@ export default function App() {
       if (d.vacations)    setVacations(d.vacations);
       if (d.empShiftNotes) setEmpShiftNotes(d.empShiftNotes);
       setFbLoaded(true);
+      // Detect schedule changes since last visit (for employee alert)
+      if (d.assigned) {
+        const CHANGE_KEY = "pharmacy_last_assigned";
+        const lastSeen = localStorage.getItem(CHANGE_KEY);
+        const currentHash = JSON.stringify(d.assigned);
+        if (lastSeen && lastSeen !== currentHash) {
+          setScheduleChanged(true);
+        }
+        localStorage.setItem(CHANGE_KEY, currentHash);
+      }
       // Restore session
       const session = loadSession();
       if (session) {
@@ -1033,6 +1047,17 @@ export default function App() {
                   📅 מציג: {formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}
                 </div>
               )}
+              {/* Change alert banner */}
+              {scheduleChanged && !showChangeModal && (
+                <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10,cursor:"pointer"}} onClick={()=>{setShowChangeModal(true);setScheduleChanged(false);}}>
+                  <div>
+                    <div style={{fontSize:15,fontWeight:"700",color:"#92400e"}}>🔔 עדכון לסידור!</div>
+                    <div style={{fontSize:13,color:"#b45309",fontWeight:"500",marginTop:2}}>השיבוץ השתנה מאז כניסתך האחרונה</div>
+                  </div>
+                  <button style={{fontSize:12,color:"#fff",background:"#f59e0b",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontWeight:"700",flexShrink:0}}>הצג שינוי</button>
+                </div>
+              )}
+
               {weekOffset === 0 && !showNextWeek && nextWeekPublished && (
                 <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10,cursor:"pointer"}} onClick={()=>setShowNextWeek(true)}>
                   <div>
@@ -1573,6 +1598,20 @@ export default function App() {
           )}
         </div>
         {changePwModal && <ChangePwModal />}
+        {showChangeModal && (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShowChangeModal(false);}}>
+            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:480}}>
+              <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2,margin:"0 auto 16px"}}></div>
+              <div style={{fontSize:18,fontWeight:"700",color:"#1e293b",marginBottom:4}}>🔔 עדכון לסידור</div>
+              <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>השיבוץ עודכן מאז כניסתך האחרונה</div>
+              <div style={{background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+                <div style={{fontSize:14,fontWeight:"600",color:"#92400e",marginBottom:4}}>💡 מה השתנה?</div>
+                <div style={{fontSize:13,color:"#78350f"}}>הסידור עודכן — עיין/י בטבלה לראות את השיבוץ הנוכחי.</div>
+              </div>
+              <button style={{width:"100%",padding:13,border:"none",borderRadius:12,background:"#1D9E75",color:"#fff",fontSize:15,fontWeight:"700",cursor:"pointer"}} onClick={()=>setShowChangeModal(false)}>הבנתי, הצג סידור</button>
+            </div>
+          </div>
+        )}
         {shiftModal && (
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShiftModal(null);}}>
             <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:480,animation:"slideUp 0.22s ease"}}>
@@ -1776,7 +1815,19 @@ export default function App() {
                           return <div key={id}>
                             {i>0&&allEmps[i-1].sh.id!==sh.id&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
-                              onClick={()=>setHoveredEmp(hoveredEmp===id?null:id)}>
+                              onClick={()=>{
+                                const now=Date.now();
+                                const last=lastEmpClickRef.current;
+                                if(last.id===id && now-last.time<400) {
+                                  // double click — open shift modal
+                                  openShiftModal("☀️ משמרת בוקר",date,sh,["רוקח","פרח"]);
+                                  lastEmpClickRef.current={id:null,time:0};
+                                } else {
+                                  // single click — highlight
+                                  setHoveredEmp(hoveredEmp===id?null:id);
+                                  lastEmpClickRef.current={id,time:now};
+                                }
+                              }}>
                               <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:"#1e293b",display:"block"}}>{emp?.name}</span>
                               <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{sh.time}{label?` ${label}`:""}</span>
                               {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
@@ -1813,7 +1864,17 @@ export default function App() {
                           return <div key={id}>
                             {i>0&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
-                              onClick={()=>setHoveredEmp(hoveredEmp===id?null:id)}>
+                              onClick={()=>{
+                                const now=Date.now();
+                                const last=lastEmpClickRef.current;
+                                if(last.id===id && now-last.time<400) {
+                                  openShiftModal("🌙 משמרת ערב",date,sh,["רוקח","פרח"]);
+                                  lastEmpClickRef.current={id:null,time:0};
+                                } else {
+                                  setHoveredEmp(hoveredEmp===id?null:id);
+                                  lastEmpClickRef.current={id,time:now};
+                                }
+                              }}>
                               <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:"#1e293b",display:"block"}}>{emp?.name}</span>
                               <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{sh.time}</span>
                               {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
