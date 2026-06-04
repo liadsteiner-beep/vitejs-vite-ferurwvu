@@ -1035,7 +1035,7 @@ export default function App() {
                   📅 מציג: {formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}
                 </div>
               )}
-              {!showNextWeek && nextWeekPublished && (
+              {weekOffset === 0 && !showNextWeek && nextWeekPublished && (
                 <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10,cursor:"pointer"}} onClick={()=>setShowNextWeek(true)}>
                   <div>
                     <div style={{fontSize:15,fontWeight:"700",color:"#15803d"}}>🎉 הסידור לשבוע הבא מוכן!</div>
@@ -1044,7 +1044,7 @@ export default function App() {
                   <button style={{fontSize:12,color:"#15803d",background:"#bbf7d0",border:"1.5px solid #86efac",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontWeight:"600",flexShrink:0}}>הצג ›</button>
                 </div>
               )}
-              {!showNextWeek && !nextWeekPublished && (
+              {weekOffset === 0 && !showNextWeek && !nextWeekPublished && (
                 <div style={{background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:"10px 14px",marginBottom:10}}>
                   <div style={{fontSize:15,fontWeight:"700",color:"#dc2626",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span>🙄 הסידור לשבוע הבא עוד לא מוכן —</span>
