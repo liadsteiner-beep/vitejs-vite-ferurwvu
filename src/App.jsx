@@ -849,21 +849,21 @@ export default function App() {
   // ── STYLES ──
   const S = {
     app:    { minHeight:"100vh", background:"#f1f5f9", fontFamily:"'Segoe UI',Tahoma,sans-serif", direction:"rtl", color:"#1e293b" },
-    header: { background:"#1e293b", padding:"12px 18px", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:100, boxShadow:"0 2px 10px rgba(0,0,0,0.2)" },
-    logo:   { fontSize:"14px", fontWeight:"800", color:"#38bdf8", lineHeight:1.3 },
+    header: { background:"#1e293b", padding:"14px 18px", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:100, boxShadow:"0 2px 10px rgba(0,0,0,0.2)" },
+    logo:   { fontSize:"16px", fontWeight:"800", color:"#38bdf8", lineHeight:1.3 },
     main:   { maxWidth:900, margin:"0 auto", padding:"16px 12px 80px" },
-    card:   { background:"#fff", border:"1px solid #e2e8f0", borderRadius:"12px", padding:"14px", marginBottom:"12px", boxShadow:"0 1px 3px rgba(0,0,0,0.05)" },
-    alertCard: { background:"#fef2f2", border:"1px solid #fca5a5", borderRadius:"12px", padding:"14px", marginBottom:"12px" },
-    btn:    (bg,fg)=>({ background:bg||"#0ea5e9", color:fg||"#fff", border:"none", borderRadius:"9px", padding:"9px 16px", fontWeight:"700", fontSize:"13px", cursor:"pointer" }),
-    btnSm:  (bg,fg)=>({ background:bg||"#64748b", color:fg||"#fff", border:"none", borderRadius:"7px", padding:"4px 10px", fontWeight:"700", fontSize:"12px", cursor:"pointer" }),
-    btnOut: (c)=>({ background:"transparent", color:c||"#1e293b", border:`2px solid ${c||"#1e293b"}`, borderRadius:"9px", padding:"8px 14px", fontWeight:"700", fontSize:"13px", cursor:"pointer" }),
-    input:  { background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"8px 12px", fontSize:"13px", color:"#1e293b", direction:"rtl", boxSizing:"border-box" },
-    tab:    (a)=>({ background:a?"#1e293b":"transparent", color:a?"#f8fafc":"#64748b", border:"none", borderRadius:"7px", padding:"6px 13px", fontWeight:"700", fontSize:"12px", cursor:"pointer" }),
-    badge:  (role)=>({ background:ROLE_COLORS[role]?.light||"#f1f5f9", color:ROLE_COLORS[role]?.dark||"#334155", border:`1px solid ${ROLE_COLORS[role]?.bg||"#cbd5e1"}`, borderRadius:"20px", padding:"2px 9px", fontSize:"11px", fontWeight:"700", display:"inline-block" }),
-    chip:   (a)=>({ border:`2px solid ${a?"#0ea5e9":"#e2e8f0"}`, background:a?"#e0f2fe":"#f8fafc", color:a?"#0369a1":"#64748b", borderRadius:"9px", padding:"7px 12px", fontWeight:"700", fontSize:"12px", cursor:"pointer", userSelect:"none" }),
-    empChip:(a,dim)=>({ border:`2px solid ${a?"#22c55e":"#0ea5e9"}`, background:a?"#dcfce7":"#eff6ff", color:a?"#15803d":"#1d4ed8", borderRadius:"9px", padding:"5px 10px", fontWeight:"700", fontSize:"12px", cursor:"pointer", userSelect:"none", opacity:dim?0.35:1 }),
-    toast:  (type)=>({ position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)", background:type==="err"?"#ef4444":"#22c55e", color:"#fff", padding:"11px 22px", borderRadius:"11px", fontWeight:"700", fontSize:"14px", zIndex:9999, boxShadow:"0 4px 20px rgba(0,0,0,0.2)", whiteSpace:"nowrap" }),
-    sTitle: { fontWeight:"800", fontSize:"13px", color:"#475569", marginBottom:8 },
+    card:   { background:"#fff", border:"1px solid #e2e8f0", borderRadius:"14px", padding:"16px", marginBottom:"12px", boxShadow:"0 1px 3px rgba(0,0,0,0.06)" },
+    alertCard: { background:"#fef2f2", border:"1px solid #fca5a5", borderRadius:"14px", padding:"14px", marginBottom:"12px" },
+    btn:    (bg,fg)=>({ background:bg||"#0ea5e9", color:fg||"#fff", border:"none", borderRadius:"10px", padding:"11px 18px", fontWeight:"700", fontSize:"15px", cursor:"pointer" }),
+    btnSm:  (bg,fg)=>({ background:bg||"#64748b", color:fg||"#fff", border:"none", borderRadius:"8px", padding:"5px 12px", fontWeight:"700", fontSize:"13px", cursor:"pointer" }),
+    btnOut: (c)=>({ background:"transparent", color:c||"#1e293b", border:`2px solid ${c||"#1e293b"}`, borderRadius:"10px", padding:"10px 16px", fontWeight:"700", fontSize:"14px", cursor:"pointer" }),
+    input:  { background:"#f8fafc", border:"1.5px solid #e2e8f0", borderRadius:"10px", padding:"10px 14px", fontSize:"15px", color:"#1e293b", direction:"rtl", boxSizing:"border-box" },
+    tab:    (a)=>({ background:a?"#1e293b":"transparent", color:a?"#f8fafc":"#64748b", border:"none", borderRadius:"8px", padding:"8px 10px", fontWeight:"700", fontSize:"14px", cursor:"pointer" }),
+    badge:  (role)=>({ background:ROLE_COLORS[role]?.light||"#f1f5f9", color:ROLE_COLORS[role]?.dark||"#334155", border:`1px solid ${ROLE_COLORS[role]?.bg||"#cbd5e1"}`, borderRadius:"20px", padding:"3px 10px", fontSize:"13px", fontWeight:"700", display:"inline-block" }),
+    chip:   (a)=>({ border:`2px solid ${a?"#0ea5e9":"#e2e8f0"}`, background:a?"#e0f2fe":"#f8fafc", color:a?"#0369a1":"#64748b", borderRadius:"9px", padding:"8px 14px", fontWeight:"700", fontSize:"13px", cursor:"pointer", userSelect:"none" }),
+    empChip:(a,dim)=>({ border:`2px solid ${a?"#22c55e":"#0ea5e9"}`, background:a?"#dcfce7":"#eff6ff", color:a?"#15803d":"#1d4ed8", borderRadius:"9px", padding:"6px 12px", fontWeight:"700", fontSize:"13px", cursor:"pointer", userSelect:"none", opacity:dim?0.35:1 }),
+    toast:  (type)=>({ position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)", background:type==="err"?"#ef4444":"#22c55e", color:"#fff", padding:"12px 24px", borderRadius:"12px", fontWeight:"700", fontSize:"15px", zIndex:9999, boxShadow:"0 4px 20px rgba(0,0,0,0.2)", whiteSpace:"nowrap" }),
+    sTitle: { fontWeight:"800", fontSize:"15px", color:"#334155", marginBottom:10 },
   };
 
   // ════════════ LOADING ════════════
@@ -1002,10 +1002,10 @@ export default function App() {
 
           {/* Tab bar */}
           <div style={{display:"flex",background:"#f1f5f9",borderRadius:"10px",padding:3,gap:3,marginBottom:12}}>
-            {published && <button style={{...S.tab(empTab==="schedule"),flex:1,borderRadius:7,fontSize:11}} onClick={()=>setEmpTab("schedule")}>📋 סידור</button>}
-            <button style={{...S.tab(empTab==="avail"),flex:1,borderRadius:7,fontSize:11}} onClick={()=>setEmpTab("avail")}>✏️ זמינות</button>
-            <button style={{...S.tab(empTab==="vac"),flex:1,borderRadius:7,fontSize:11}} onClick={()=>setEmpTab("vac")}>🌴 חופשה</button>
-            <button style={{...S.tab(empTab==="note"),flex:1,borderRadius:7,fontSize:11}} onClick={()=>setEmpTab("note")}>📝 הערה</button>
+            {published && <button style={{...S.tab(empTab==="schedule"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("schedule")}>📋 סידור</button>}
+            <button style={{...S.tab(empTab==="avail"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("avail")}>✏️ זמינות</button>
+            <button style={{...S.tab(empTab==="vac"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("vac")}>🌴 חופשה</button>
+            <button style={{...S.tab(empTab==="note"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("note")}>📝 הערה</button>
           </div>
 
 
@@ -1018,24 +1018,24 @@ export default function App() {
               {!showNextWeek && nextWeekPublished && (
                 <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10,cursor:"pointer"}} onClick={()=>setShowNextWeek(true)}>
                   <div>
-                    <div style={{fontSize:13,fontWeight:"600",color:"#15803d"}}>🎉 הסידור לשבוע הבא מוכן!</div>
-                    <div style={{fontSize:11,color:"#16a34a",marginTop:2}}>{formatDateShort(nextWeekDates[0])} – {formatDateShort(nextWeekDates[6])}</div>
+                    <div style={{fontSize:15,fontWeight:"700",color:"#15803d"}}>🎉 הסידור לשבוע הבא מוכן!</div>
+                    <div style={{fontSize:13,color:"#16a34a",fontWeight:"500",marginTop:3}}>{formatDateShort(nextWeekDates[0])} – {formatDateShort(nextWeekDates[6])}</div>
                   </div>
                   <button style={{fontSize:12,color:"#15803d",background:"#bbf7d0",border:"1.5px solid #86efac",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontWeight:"600",flexShrink:0}}>הצג ›</button>
                 </div>
               )}
               {!showNextWeek && !nextWeekPublished && (
                 <div style={{background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:"10px 14px",marginBottom:10}}>
-                  <div style={{fontSize:13,fontWeight:"600",color:"#dc2626",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                  <div style={{fontSize:15,fontWeight:"700",color:"#dc2626",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span>🙄 הסידור לשבוע הבא עוד לא מוכן —</span>
-                    <span style={{fontWeight:"500",color:"#ef4444"}}>אני על זה!</span>
+                    <span style={{fontWeight:"600",fontSize:14,color:"#ef4444"}}>אני על זה!</span>
                   </div>
                 </div>
               )}
               {showNextWeek && (
                 <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                   <span style={{fontSize:12,fontWeight:"600",color:"#15803d"}}>שבוע {formatDateShort(nextWeekDates[0])} – {formatDateShort(nextWeekDates[6])}</span>
-                  <button style={{fontSize:11,border:"none",background:"none",color:"#64748b",cursor:"pointer",textDecoration:"underline"}} onClick={()=>setShowNextWeek(false)}>‹ חזור לשבוע הנוכחי</button>
+                  <button style={{fontSize:13,border:"none",background:"none",color:"#64748b",cursor:"pointer",textDecoration:"underline"}} onClick={()=>setShowNextWeek(false)}>‹ חזור לשבוע הנוכחי</button>
                 </div>
               )}
               <style>{`
@@ -1079,7 +1079,7 @@ export default function App() {
                     <tr>
                       <td style={{background:"#f0fdf4",padding:"6px 3px",borderLeft:"3px solid #22c55e",border:"0.5px solid #e2e8f0",textAlign:"center",verticalAlign:"middle",position:"sticky",left:0,zIndex:1}}>
                         <span style={{fontSize:16}}>☀️</span>
-                        <span style={{display:"block",fontSize:9,fontWeight:"600",color:"#15803d",marginTop:2}}>בוקר</span>
+                        <span style={{display:"block",fontSize:11,fontWeight:"700",color:"#15803d",marginTop:2}}>בוקר</span>
                       </td>
                       {displayDates.map(date=>{
                         const ds=DAY_SHIFTS[date.getDay()]||[];
@@ -1104,11 +1104,11 @@ export default function App() {
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
                                 <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
-                                {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
+                                {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                               </div>;
                             })}
                             {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
-                            {shiftNote&&allEmps.length>0&&<div style={{fontSize:8,color:"#92400e",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginTop:2}}>{shiftNote}</div>}
+                            {shiftNote&&allEmps.length>0&&<div style={{fontSize:11,color:"#92400e",fontWeight:"600",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginTop:2}}>{shiftNote}</div>}
                           </td>
                         );
                       })}
@@ -1119,7 +1119,7 @@ export default function App() {
                     <tr>
                       <td style={{background:"#f5f3ff",padding:"6px 3px",borderLeft:"3px solid #6366f1",border:"0.5px solid #e2e8f0",textAlign:"center",verticalAlign:"middle",position:"sticky",left:0,zIndex:1}}>
                         <span style={{fontSize:16}}>🌙</span>
-                        <span style={{display:"block",fontSize:9,fontWeight:"600",color:"#4338ca",marginTop:2}}>ערב</span>
+                        <span style={{display:"block",fontSize:11,fontWeight:"700",color:"#4338ca",marginTop:2}}>ערב</span>
                       </td>
                       {displayDates.map(date=>{
                         const ds=DAY_SHIFTS[date.getDay()]||[];
@@ -1142,11 +1142,11 @@ export default function App() {
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
                                 <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}</span>
-                                {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
+                                {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                               </div>;
                             })}
                             {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
-                            {shiftNote&&allEmps.length>0&&<div style={{fontSize:8,color:"#92400e",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginTop:2}}>{shiftNote}</div>}
+                            {shiftNote&&allEmps.length>0&&<div style={{fontSize:11,color:"#92400e",fontWeight:"600",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginTop:2}}>{shiftNote}</div>}
                           </td>
                         );
                       })}
@@ -1154,7 +1154,7 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
-              <div style={{fontSize:10,color:"#94a3b8",textAlign:"center",marginTop:6}}>לחצי על משמרת לפרטים • סובב לתצוגה מלאה</div>
+              <div style={{fontSize:12,color:"#64748b",textAlign:"center",marginTop:8}}>לחצי על משמרת לפרטים • סובב לתצוגה מלאה</div>
 
               {/* Download & Share buttons */}
               <div style={{display:"flex",gap:8,marginTop:10}}>
@@ -1238,7 +1238,7 @@ export default function App() {
                 return (
                   <div style={{marginTop:16}}>
                     {/* Shift cards */}
-                    <div style={{fontWeight:"700",fontSize:13,color:"#475569",marginBottom:8}}>⭐ המשמרות שלי</div>
+                    <div style={{fontWeight:"700",fontSize:16,color:"#334155",marginBottom:10}}>⭐ המשמרות שלי</div>
                     {myShiftList.map(({date,sh,shiftLabel,shiftIcon},i)=>{
                       const endDate=new Date(date); const [endH]=(sh.time.split("-")[1]?.split(":").map(Number)||[23]); endDate.setHours(endH,0,0,0);
                       const startDate=new Date(date); const [startH]=sh.time.split(":").map(Number); startDate.setHours(startH,0,0,0);
@@ -1247,15 +1247,15 @@ export default function App() {
                       const empNote=getEmpShiftNote(currentUser.id,date,sh.id);
                       return (
                         <div key={i} style={{...S.card,opacity:isDone?0.6:1,border:isDone?"1.5px solid #22c55e":isToday?"1.5px solid #378ADD":"1px solid #e2e8f0",marginBottom:8,display:"flex",alignItems:"center",gap:12,background:isDone?"#f0fdf4":"#fff"}}>
-                          <div style={{width:36,height:36,borderRadius:8,background:isDone?"#dcfce7":["morning","open"].includes(sh.id)?"#FAEEDA":"#EEEDFE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:isDone?22:18,flexShrink:0}}>{isDone?"✓":shiftIcon}</div>
+                          <div style={{width:42,height:42,borderRadius:10,background:isDone?"#dcfce7":["morning","open"].includes(sh.id)?"#FAEEDA":"#EEEDFE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:isDone?26:22,flexShrink:0}}>{isDone?"✓":shiftIcon}</div>
                           <div style={{flex:1}}>
-                            <div style={{fontSize:13,fontWeight:"500",color:isDone?"#15803d":"#1e293b"}}>{date.toLocaleDateString("he-IL",{weekday:"long"})} — {shiftLabel}</div>
-                            <div style={{fontSize:11,color:isDone?"#16a34a":"#64748b",marginTop:1}}>{sh.time}</div>
+                            <div style={{fontSize:15,fontWeight:"700",color:isDone?"#15803d":"#1e293b"}}>{date.toLocaleDateString("he-IL",{weekday:"long"})} — {shiftLabel}</div>
+                            <div style={{fontSize:13,color:isDone?"#16a34a":"#475569",fontWeight:"500",marginTop:2}}>{sh.time}</div>
                             {empNote&&<div style={{fontSize:11,color:"#64748b",fontStyle:"italic",marginTop:2}}>{empNote}</div>}
                           </div>
                           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                             <span style={{fontSize:18}}>{MOOD_EMOJIS[Math.round((i/(Math.max(total-1,1)))*(MOOD_EMOJIS.length-1))]}</span>
-                            <span style={{fontSize:10,padding:"2px 7px",borderRadius:20,fontWeight:"600",background:isDone?"#dcfce7":isToday?"#E6F1FB":"#f1f5f9",color:isDone?"#15803d":isToday?"#185FA5":"#94a3b8",border:isDone?"1.5px solid #22c55e":"none"}}>
+                            <span style={{fontSize:12,padding:"3px 9px",borderRadius:20,fontWeight:"700",background:isDone?"#dcfce7":isToday?"#E6F1FB":"#f1f5f9",color:isDone?"#15803d":isToday?"#185FA5":"#94a3b8",border:isDone?"1.5px solid #22c55e":"none"}}>
                               {isDone?"✓ הסתיים":isToday?"היום":"בקרוב"}
                             </span>
                           </div>
@@ -1268,11 +1268,11 @@ export default function App() {
                       <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:10}}>
                         <div style={{fontSize:40,lineHeight:1,flexShrink:0}}>{moodEmoji}</div>
                         <div style={{flex:1}}>
-                          <div style={{fontSize:13,fontWeight:"500",color:"#1e293b",marginBottom:5}}>{encourage}</div>
-                          <div style={{height:7,background:"#e2e8f0",borderRadius:4,overflow:"hidden"}}>
+                          <div style={{fontSize:15,fontWeight:"600",color:"#1e293b",marginBottom:6}}>{encourage}</div>
+                          <div style={{height:10,background:"#e2e8f0",borderRadius:5,overflow:"hidden"}}>
                             <div style={{height:"100%",width:`${(doneSoFar/total)*100}%`,background:"#1D9E75",borderRadius:4,transition:"width 0.5s ease"}}></div>
                           </div>
-                          <div style={{fontSize:11,color:"#64748b",marginTop:3}}>{doneSoFar} מתוך {total} הושלמו</div>
+                          <div style={{fontSize:13,color:"#475569",fontWeight:"500",marginTop:4}}>{doneSoFar} מתוך {total} הושלמו</div>
                         </div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:4}}>
@@ -1282,7 +1282,7 @@ export default function App() {
                           const isDone=endDate<now;
                           const isToday=now>=startDate&&now<=endDate;
                           return [
-                            <div key={`d${i}`} style={{width:24,height:24,borderRadius:"50%",background:isDone?"#1D9E75":isToday?"#378ADD":"#fff",border:`1.5px solid ${isDone?"#1D9E75":isToday?"#378ADD":"#e2e8f0"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:isDone?11:10,color:isDone||isToday?"#fff":"#94a3b8"}}>
+                            <div key={`d${i}`} style={{width:28,height:28,borderRadius:"50%",background:isDone?"#1D9E75":isToday?"#378ADD":"#fff",border:`1.5px solid ${isDone?"#1D9E75":isToday?"#378ADD":"#e2e8f0"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:isDone?11:10,color:isDone||isToday?"#fff":"#94a3b8"}}>
                               {isDone?"✓":isToday?"⏰":date.toLocaleDateString("he-IL",{weekday:"narrow"})}
                             </div>,
                             i<myShiftList.length-1&&<div key={`l${i}`} style={{flex:1,height:2,background:isDone?"#1D9E75":"#e2e8f0",borderRadius:1}}></div>
@@ -1740,7 +1740,7 @@ export default function App() {
                   <tr>
                     <td style={{background:"#f0fdf4",padding:"6px 3px",borderLeft:"3px solid #22c55e",border:"0.5px solid #e2e8f0",textAlign:"center",verticalAlign:"middle",position:"sticky",left:0,zIndex:1}}>
                       <span style={{fontSize:16}}>☀️</span>
-                      <span style={{display:"block",fontSize:9,fontWeight:"600",color:"#15803d",marginTop:2}}>בוקר</span>
+                      <span style={{display:"block",fontSize:11,fontWeight:"700",color:"#15803d",marginTop:2}}>בוקר</span>
                     </td>
                     {weekDates.map(date=>{
                       const ds=DAY_SHIFTS[date.getDay()]||[];
@@ -1764,12 +1764,12 @@ export default function App() {
                               onClick={()=>setHoveredEmp(hoveredEmp===id?null:id)}>
                               <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:"#1e293b",display:"block"}}>{emp?.name}</span>
                               <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
-                              {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
+                              {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
                         })}
                         {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
-                        {note&&<div style={{fontSize:8,color:"#92400e",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginTop:2}}>{note}</div>}
+                        {note&&<div style={{fontSize:11,color:"#92400e",fontWeight:"600",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginTop:2}}>{note}</div>}
                       </td>;
                     })}
                   </tr>
@@ -1779,7 +1779,7 @@ export default function App() {
                   <tr>
                     <td style={{background:"#f5f3ff",padding:"6px 3px",borderLeft:"3px solid #6366f1",border:"0.5px solid #e2e8f0",textAlign:"center",verticalAlign:"middle",position:"sticky",left:0,zIndex:1}}>
                       <span style={{fontSize:16}}>🌙</span>
-                      <span style={{display:"block",fontSize:9,fontWeight:"600",color:"#4338ca",marginTop:2}}>ערב</span>
+                      <span style={{display:"block",fontSize:11,fontWeight:"700",color:"#4338ca",marginTop:2}}>ערב</span>
                     </td>
                     {weekDates.map(date=>{
                       const ds=DAY_SHIFTS[date.getDay()]||[];
@@ -1801,12 +1801,12 @@ export default function App() {
                               onClick={()=>setHoveredEmp(hoveredEmp===id?null:id)}>
                               <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:"#1e293b",display:"block"}}>{emp?.name}</span>
                               <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}</span>
-                              {n&&<span style={{fontSize:8,color:"#475569",fontStyle:"italic",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
+                              {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
                         })}
                         {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
-                        {note&&<div style={{fontSize:8,color:"#92400e",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginTop:2}}>{note}</div>}
+                        {note&&<div style={{fontSize:11,color:"#92400e",fontWeight:"600",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginTop:2}}>{note}</div>}
                       </td>;
                     })}
                   </tr>
