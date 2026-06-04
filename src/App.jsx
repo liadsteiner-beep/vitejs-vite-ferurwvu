@@ -1057,19 +1057,17 @@ export default function App() {
                 </div>
               )}
               <style>{`
-                @keyframes rotSpin { 0%,100%{transform:rotate(0deg)} 40%{transform:rotate(90deg)} 60%{transform:rotate(90deg)} }
-                .sched-rotate-tip { display:none; }
-                .sched-scroll-wrap { overflow-x:auto; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08); direction:ltr; }
+                .sched-scroll-wrap { overflow-x:auto; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08); touch-action:pan-x pan-y pinch-zoom; direction:ltr; }
                 @media (orientation: landscape) {
                   .sched-scroll-wrap { overflow-x:visible; }
                   .sched-scroll-wrap table { min-width:unset !important; width:100%; }
                 }
               `}</style>
               <div className="sched-scroll-wrap" style={{direction:"ltr"}}>
-                <table style={{borderCollapse:"collapse",fontSize:13,minWidth:520,background:"#fff",direction:"rtl"}}>
+                <table style={{borderCollapse:"collapse",fontSize:13,minWidth:840,background:"#fff",direction:"rtl",width:"100%"}}>
                   <thead>
                     <tr style={{background:"#1D9E75",color:"#fff"}}>
-                      <th style={{padding:"8px 8px",border:"0.5px solid #0F6E56",width:46,textAlign:"center",fontSize:10,fontWeight:"500",position:"sticky",left:0,background:"#1D9E75",zIndex:2}}></th>
+                      <th style={{padding:"9px 6px",border:"0.5px solid #0F6E56",width:46,textAlign:"center",fontSize:10,fontWeight:"500",position:"sticky",left:0,background:"#1D9E75",zIndex:2}}></th>
                       {empDisplayDates.map(date=>{
                         const midnight=new Date(date); midnight.setHours(23,59,59,0);
                         const isPast=midnight<new Date();
@@ -1121,8 +1119,8 @@ export default function App() {
                               const n=getEmpShiftNote(id,date,sh.id);
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
-                                {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
+                                <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{sh.time}{label?` ${label}`:""}</span>
+                                {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1,whiteSpace:"nowrap"}}>{n}</span>}
                               </div>;
                             })}
                             {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
@@ -1159,7 +1157,7 @@ export default function App() {
                               const n=getEmpShiftNote(id,date,sh.id);
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}</span>
+                                <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{sh.time}</span>
                                 {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                               </div>;
                             })}
@@ -1780,7 +1778,7 @@ export default function App() {
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
                               onClick={()=>setHoveredEmp(hoveredEmp===id?null:id)}>
                               <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:"#1e293b",display:"block"}}>{emp?.name}</span>
-                              <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}{label?` ${label}`:""}</span>
+                              <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{sh.time}{label?` ${label}`:""}</span>
                               {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
@@ -1817,7 +1815,7 @@ export default function App() {
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
                               onClick={()=>setHoveredEmp(hoveredEmp===id?null:id)}>
                               <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:"#1e293b",display:"block"}}>{emp?.name}</span>
-                              <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block"}}>{sh.time}</span>
+                              <span style={{fontSize:11,color:"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{sh.time}</span>
                               {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
