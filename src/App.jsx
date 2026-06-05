@@ -2423,11 +2423,14 @@ export default function App() {
               const today = new Date(); today.setHours(0,0,0,0);
               const parseDate = str => {
                 if(!str) return null;
-                const parts = str.split("/").map(Number);
-                if(parts.length===3) return new Date(parts[2]<100?parts[2]+2000:parts[2], parts[1]-1, parts[0]);
-                const p2 = str.split(".").map(Number);
-                if(p2.length===3) return new Date(p2[2]<100?p2[2]+2000:p2[2], p2[1]-1, p2[0]);
-                return null;
+                // Try splitting by / or . — format: D/M/YYYY or D.M.YYYY
+                const sep = str.includes("/") ? "/" : str.includes(".") ? "." : null;
+                if(!sep) return null;
+                const parts = str.split(sep).map(s=>parseInt(s,10));
+                if(parts.length!==3 || parts.some(isNaN)) return null;
+                const [d,m,y] = parts;
+                const year = y < 100 ? y + 2000 : y;
+                return new Date(year, m-1, d);
               };
               // Collect all approved vacations flat
               const all = [];
@@ -2573,33 +2576,60 @@ export default function App() {
       </div>
 
       {changePwModal && <ChangePwModal />}
-      {timeEditModal && (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setTimeEditModal(null);}}>
-          <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:480,direction:"rtl"}}>
-            <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2,margin:"0 auto 16px"}}></div>
-            <div style={{fontSize:17,fontWeight:"700",color:"#1e293b",marginBottom:4}}>✏️ שינוי שעות משמרת</div>
-            <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>
-              {employees.find(e=>e.id===timeEditModal.id)?.name} • {timeEditModal.sh.label} • {timeEditModal.date.toLocaleDateString("he-IL",{weekday:"short",day:"numeric",month:"numeric"})}
-            </div>
-            <input
-              style={{width:"100%",fontSize:16,padding:"11px 14px",border:"1.5px solid #a78bfa",borderRadius:10,color:"#6d28d9",background:"#ede9fe",fontWeight:"600",boxSizing:"border-box",direction:"ltr",textAlign:"center",marginBottom:12}}
-              placeholder={getShiftTime(timeEditModal.sh, timeEditModal.role)}
-              defaultValue={timeEditModal.currentTime}
-              id="time-edit-input"
-            />
-            <div style={{display:"flex",gap:8}}>
-              <button style={{flex:1,padding:12,border:"1.5px solid #e2e8f0",borderRadius:10,background:"#f8fafc",color:"#64748b",fontSize:14,fontWeight:"700",cursor:"pointer"}}
-                onClick={()=>{ setEmpShiftTimeVal(timeEditModal.id,timeEditModal.date,timeEditModal.sh.id,""); setTimeEditModal(null); showToast("שעות אופסו ✓"); }}>
-                אפס לברירת מחדל
-              </button>
-              <button style={{flex:1,padding:12,border:"none",borderRadius:10,background:"#6d28d9",color:"#fff",fontSize:14,fontWeight:"700",cursor:"pointer"}}
-                onClick={()=>{ const val=document.getElementById("time-edit-input").value.trim(); if(val){setEmpShiftTimeVal(timeEditModal.id,timeEditModal.date,timeEditModal.sh.id,val);} setTimeEditModal(null); showToast("שעות עודכנו ✓"); }}>
-                שמור
-              </button>
+      {timeEditModal && (()=>{
+        const defaultTime = getShiftTime(timeEditModal.sh, timeEditModal.role);
+        const existing = getEmpShiftTime(timeEditModal.id, timeEditModal.date, timeEditModal.sh.id);
+        const [start, end] = (existing || defaultTime).split("-");
+        // Use local state via key trick — each open gets fresh inputs
+        return (
+          <div key={`${timeEditModal.id}_${dateKey(timeEditModal.date)}_${timeEditModal.sh.id}`}
+            style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+            onClick={e=>{if(e.target===e.currentTarget)setTimeEditModal(null);}}>
+            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:480,direction:"rtl"}}>
+              <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2,margin:"0 auto 16px"}}></div>
+              <div style={{fontSize:17,fontWeight:"700",color:"#1e293b",marginBottom:4}}>✏️ שינוי שעות משמרת</div>
+              <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>
+                {employees.find(e=>e.id===timeEditModal.id)?.name} • {timeEditModal.sh.label} • {timeEditModal.date.toLocaleDateString("he-IL",{weekday:"short",day:"numeric",month:"numeric"})}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,color:"#64748b",marginBottom:4,textAlign:"center"}}>התחלה</div>
+                  <input id="te-start"
+                    style={{width:"100%",fontSize:18,padding:"11px 10px",border:"1.5px solid #1D9E75",borderRadius:10,color:"#1e293b",fontWeight:"700",boxSizing:"border-box",direction:"ltr",textAlign:"center"}}
+                    defaultValue={start||""}
+                    placeholder="08:30"
+                  />
+                </div>
+                <div style={{fontSize:22,color:"#94a3b8",fontWeight:"300",marginTop:18}}>—</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,color:"#64748b",marginBottom:4,textAlign:"center"}}>סיום</div>
+                  <input id="te-end"
+                    style={{width:"100%",fontSize:18,padding:"11px 10px",border:"1.5px solid #1D9E75",borderRadius:10,color:"#1e293b",fontWeight:"700",boxSizing:"border-box",direction:"ltr",textAlign:"center"}}
+                    defaultValue={end||""}
+                    placeholder="16:00"
+                  />
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button style={{flex:1,padding:12,border:"1.5px solid #e2e8f0",borderRadius:10,background:"#f8fafc",color:"#64748b",fontSize:14,fontWeight:"700",cursor:"pointer"}}
+                  onClick={()=>{ setEmpShiftTimeVal(timeEditModal.id,timeEditModal.date,timeEditModal.sh.id,""); setTimeEditModal(null); showToast("שעות אופסו ✓"); }}>
+                  אפס
+                </button>
+                <button style={{flex:2,padding:12,border:"none",borderRadius:10,background:"#1D9E75",color:"#fff",fontSize:14,fontWeight:"700",cursor:"pointer"}}
+                  onClick={()=>{
+                    const s=document.getElementById("te-start")?.value.trim();
+                    const e2=document.getElementById("te-end")?.value.trim();
+                    if(s&&e2){ setEmpShiftTimeVal(timeEditModal.id,timeEditModal.date,timeEditModal.sh.id,`${s}-${e2}`); }
+                    setTimeEditModal(null);
+                    showToast("שעות עודכנו ✓");
+                  }}>
+                  שמור
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       {toast && <div style={S.toast(toast.type)}>{toast.msg}</div>}
     </div>
   );
