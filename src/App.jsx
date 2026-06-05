@@ -627,7 +627,7 @@ export default function App() {
   function getEmpShiftTime(empId, date, shiftId) {
     const st = getEmpShiftNote(empId, date, shiftId+"|st");
     const en = getEmpShiftNote(empId, date, shiftId+"|en");
-    return st && en ? `${st}-${en}` : null;
+    return st && en ? `${st}-${en}` : st ? `${st}-` : en ? `-${en}` : null;
   }
 
   // Open time edit modal
@@ -1022,7 +1022,22 @@ export default function App() {
           <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>{timeEditModal.empName} — {formatDate(timeEditModal.date)}</div>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,direction:"ltr"}}>
             <div style={{flex:1}}>
-              <div style={{fontSize:11,color:"#64748b",marginBottom:4,direction:"rtl"}}>התחלה</div>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:4,direction:"rtl",textAlign:"center"}}>סיום</div>
+              <input
+                style={{...S.input,width:"100%",fontSize:17,textAlign:"center",fontWeight:"700",direction:"ltr"}}
+                placeholder="16:00"
+                maxLength={5}
+                value={en}
+                onChange={e=>{
+                  let v=e.target.value.replace(/[^0-9:]/g,"");
+                  if(v.length===4&&!v.includes(":")) v=v.slice(0,2)+":"+v.slice(2);
+                  setEn(v);
+                }}
+              />
+            </div>
+            <span style={{fontSize:20,color:"#94a3b8",marginTop:16}}>—</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:4,direction:"rtl",textAlign:"center"}}>התחלה</div>
               <input
                 style={{...S.input,width:"100%",fontSize:17,textAlign:"center",fontWeight:"700",direction:"ltr"}}
                 placeholder="08:30"
@@ -1036,26 +1051,11 @@ export default function App() {
                 autoFocus
               />
             </div>
-            <span style={{fontSize:20,color:"#94a3b8",marginTop:16}}>—</span>
-            <div style={{flex:1}}>
-              <div style={{fontSize:11,color:"#64748b",marginBottom:4,direction:"rtl"}}>סיום</div>
-              <input
-                style={{...S.input,width:"100%",fontSize:17,textAlign:"center",fontWeight:"700",direction:"ltr"}}
-                placeholder="16:00"
-                maxLength={5}
-                value={en}
-                onChange={e=>{
-                  let v=e.target.value.replace(/[^0-9:]/g,"");
-                  if(v.length===4&&!v.includes(":")) v=v.slice(0,2)+":"+v.slice(2);
-                  setEn(v);
-                }}
-              />
-            </div>
           </div>
           <div style={{display:"flex",gap:8}}>
             <button style={{...S.btn("#0ea5e9"),flex:2}} onClick={()=>{
-              setEmpShiftNote(timeEditModal.empId, timeEditModal.date, timeEditModal.shiftId+"|st", st);
-              setEmpShiftNote(timeEditModal.empId, timeEditModal.date, timeEditModal.shiftId+"|en", en);
+              if (st) setEmpShiftNote(timeEditModal.empId, timeEditModal.date, timeEditModal.shiftId+"|st", st);
+              if (en) setEmpShiftNote(timeEditModal.empId, timeEditModal.date, timeEditModal.shiftId+"|en", en);
               setTimeEditModal(null);
               showToast("שעות עודכנו ✓");
             }}>שמור</button>
