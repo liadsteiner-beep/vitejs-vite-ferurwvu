@@ -1320,12 +1320,9 @@ export default function App() {
                 </div>
               )}
               {scheduleChanged && !showChangeModal && (
-                <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10,cursor:"pointer"}} onClick={()=>{setShowChangeModal(true);setScheduleChanged(false);}}>
-                  <div>
-                    <div style={{fontSize:15,fontWeight:"700",color:"#92400e"}}>🔔 עדכון לסידור!</div>
-                    <div style={{fontSize:13,color:"#b45309",fontWeight:"500",marginTop:2}}>השיבוץ השתנה מאז כניסתך האחרונה</div>
-                  </div>
-                  <button style={{fontSize:12,color:"#fff",background:"#f59e0b",border:"none",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontWeight:"700",flexShrink:0}}>הצג שינוי</button>
+                <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:8,padding:"10px 14px",marginBottom:10}}>
+                  <div style={{fontSize:15,fontWeight:"700",color:"#92400e"}}>🔔 עדכון לסידור!</div>
+                  <div style={{fontSize:13,color:"#b45309",fontWeight:"500",marginTop:2}}>השיבוץ השתנה מאז כניסתך האחרונה</div>
                 </div>
               )}
 
@@ -1916,12 +1913,6 @@ export default function App() {
           </div>)}
 
           <div style={{textAlign:"center",color:"#94a3b8",fontSize:11,marginTop:4}}>נשמר אוטומטית</div>
-          {empTab !== "schedule" && (
-            <button style={{...S.btn("#22c55e"),width:"100%",marginTop:12,padding:14,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
-              onClick={()=>showToast("הזמינות נשלחה למנהלת ✓")}>
-              ✅ שלח
-            </button>
-          )}
         </div>
         {changePwModal && <ChangePwModal />}
         {timeEditModal && <TimeEditModal />}
