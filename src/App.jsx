@@ -1257,10 +1257,15 @@ export default function App() {
                 return endD && endD >= today;
               })
             );
-            if (!upcoming.length || empTab !== "schedule") return null;
+            const VAC_SEEN_KEY = `vac_banner_seen_${currentUser.id}`;
+            const vacSeen = localStorage.getItem(VAC_SEEN_KEY) === "true";
+            if (!upcoming.length || empTab !== "schedule" || vacSeen) return null;
             return (
               <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10,cursor:"pointer"}}
-                onClick={()=>setEmpTab("vac")}>
+                onClick={()=>{
+                  setEmpTab("vac");
+                  try { localStorage.setItem(VAC_SEEN_KEY,"true"); } catch {}
+                }}>
                 <div>
                   <div style={{fontSize:14,fontWeight:"700",color:"#15803d"}}>🌴 חופשים קרובים בצוות</div>
                   <div style={{fontSize:12,color:"#16a34a",marginTop:2}}>{upcoming.length} {upcoming.length>1?"חופשות":"חופשה"} מאושר{upcoming.length>1?"ות":""} — לחצי לצפייה</div>
