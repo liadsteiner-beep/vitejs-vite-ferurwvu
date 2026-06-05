@@ -1165,10 +1165,13 @@ export default function App() {
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
+                              const st=getEmpShiftNote(id,date,sh.id+"|st");
+                              const en=getEmpShiftNote(id,date,sh.id+"|en");
+                              const customTime=st&&en?`${st}-${en}`:null;
                               const isHarish=n&&n.includes("חריש בעיר");
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):isHarish?"#fdf2f4":"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":isHarish?"#8b2a3a":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:11,color:isHarish?"#8b2a3a":"#334155",fontWeight:isHarish?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role)}{label?` ${label}`:""}</span>
+                                <span style={{fontSize:11,color:isHarish?"#8b2a3a":"#334155",fontWeight:isHarish?"700":"600",display:"block",whiteSpace:"nowrap"}}>{customTime||getShiftTime(sh,role)}{label?` ${label}`:""}</span>
                                 {n&&<span style={{fontSize:11,color:isHarish?"#8b2a3a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${isHarish?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1,whiteSpace:"nowrap"}}>{n}</span>}
                               </div>;
                             })}
@@ -1204,10 +1207,13 @@ export default function App() {
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
+                              const st=getEmpShiftNote(id,date,sh.id+"|st");
+                              const en=getEmpShiftNote(id,date,sh.id+"|en");
+                              const customTime=st&&en?`${st}-${en}`:null;
                               const isHarish=n&&n.includes("חריש בעיר");
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):isHarish?"#fdf2f4":"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":isHarish?"#8b2a3a":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:11,color:isHarish?"#8b2a3a":"#334155",fontWeight:isHarish?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role)}</span>
+                                <span style={{fontSize:11,color:isHarish?"#8b2a3a":"#334155",fontWeight:isHarish?"700":"600",display:"block",whiteSpace:"nowrap"}}>{customTime||getShiftTime(sh,role)}</span>
                                 {n&&<span style={{fontSize:11,color:isHarish?"#8b2a3a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${isHarish?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
                               </div>;
                             })}
@@ -2055,6 +2061,32 @@ export default function App() {
                                         onChange={e=>setEmpShiftNote(id,date,shift.id,e.target.value)}
                                         onClick={e=>e.stopPropagation()}
                                       />
+                                      {/* Time override - two inputs with auto HH:MM */}
+                                      <div style={{display:"flex",alignItems:"center",gap:2,marginTop:2}} onClick={e=>e.stopPropagation()}>
+                                        <input
+                                          style={{flex:1,fontSize:9,padding:"2px 3px",border:"1px solid #c7d2fe",borderRadius:4,color:"#1e293b",background:"#eef2ff",textAlign:"center",fontWeight:"600",direction:"ltr",boxSizing:"border-box"}}
+                                          placeholder="08:30"
+                                          maxLength={5}
+                                          value={(getEmpShiftNote(id,date,shift.id+"|st"))||""}
+                                          onChange={e=>{
+                                            let v=e.target.value.replace(/[^0-9:]/g,"");
+                                            if(v.length===4&&!v.includes(":")) v=v.slice(0,2)+":"+v.slice(2);
+                                            setEmpShiftNote(id,date,shift.id+"|st",v);
+                                          }}
+                                        />
+                                        <span style={{fontSize:9,color:"#94a3b8"}}>—</span>
+                                        <input
+                                          style={{flex:1,fontSize:9,padding:"2px 3px",border:"1px solid #c7d2fe",borderRadius:4,color:"#1e293b",background:"#eef2ff",textAlign:"center",fontWeight:"600",direction:"ltr",boxSizing:"border-box"}}
+                                          placeholder="16:00"
+                                          maxLength={5}
+                                          value={(getEmpShiftNote(id,date,shift.id+"|en"))||""}
+                                          onChange={e=>{
+                                            let v=e.target.value.replace(/[^0-9:]/g,"");
+                                            if(v.length===4&&!v.includes(":")) v=v.slice(0,2)+":"+v.slice(2);
+                                            setEmpShiftNote(id,date,shift.id+"|en",v);
+                                          }}
+                                        />
+                                      </div>
 
                                     </div>
                                   );
