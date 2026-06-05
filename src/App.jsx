@@ -456,8 +456,27 @@ export default function App() {
       }
       if (d.dutyPeriod)   setDutyPeriod(d.dutyPeriod);
       if (d.dutyAvail)    setDutyAvail(d.dutyAvail);
-      if (d.dutyAssign)   setDutyAssign(d.dutyAssign);
-      if (d.dutyPublished) setDutyPublished(d.dutyPublished);
+      const initialDuty = [
+          { date:"6/6/2026",  emp1:"ליאן",  emp2:"סלאם" },
+          { date:"13/6/2026", emp1:"ליאן",  emp2:"סג׳א" },
+          { date:"20/6/2026", emp1:"סלאם",  emp2:"סמר"  },
+          { date:"27/6/2026", emp1:"סג׳א",  emp2:"ליעד" },
+          { date:"4/7/2026",  emp1:"סלאם",  emp2:"סמר"  },
+          { date:"11/7/2026", emp1:"ליאן",  emp2:"סג׳א" },
+          { date:"18/7/2026", emp1:"סלאם",  emp2:"סמר"  },
+          { date:"25/7/2026", emp1:"ליעד",  emp2:"ליאן" },
+      ];
+      if (d.dutyAssign && d.dutyAssign.length > 0) {
+        setDutyAssign(d.dutyAssign);
+      } else {
+        setDutyAssign(initialDuty);
+        fbSave({ ...d, dutyAssign: initialDuty, dutyPublished: true, dutyAvailOpen: false });
+      }
+      if (d.dutyPublished !== undefined) {
+        setDutyPublished(d.dutyPublished);
+      } else {
+        setDutyPublished(true);
+      }
       if (d.dutyAvailOpen !== undefined) {
         setDutyAvailOpen(d.dutyAvailOpen);
       }
@@ -1496,10 +1515,20 @@ export default function App() {
                     if(getAssigned(date,sh.id,myRole).includes(currentUser.id)){
                       const shiftLabel = ["morning","open"].includes(sh.id)?"בוקר":sh.id==="close"?"סגירה":"ערב";
                       const shiftIcon  = ["morning","open"].includes(sh.id)?"☀️":"🌙";
-                      myShiftList.push({date,sh,shiftLabel,shiftIcon});
+                      myShiftList.push({date,sh,shiftLabel,shiftIcon,isDuty:false,partner:null});
                     }
                   });
                 });
+                // הוסף תורנות שישי אם יש לרוקח השבוע
+                if (myRole==="רוקח" && dutyPublished && dutyAssign.length) {
+                  const friday = weekDates[5];
+                  const fridayKey = `${friday.getDate()}/${friday.getMonth()+1}/${friday.getFullYear()}`;
+                  const dutyRow = dutyAssign.find(r => r.date===fridayKey && (r.emp1===currentUser.name||r.emp2===currentUser.name));
+                  if (dutyRow) {
+                    const partner = dutyRow.emp1===currentUser.name ? dutyRow.emp2 : dutyRow.emp1;
+                    myShiftList.push({date:friday, sh:{id:"duty",label:"תורנות",time:"08:00-16:00"}, shiftLabel:"תורנות", shiftIcon:"⭐", isDuty:true, partner});
+                  }
+                }
                 const total = myShiftList.length;
                 const now = new Date();
                 const doneSoFar = myShiftList.filter(({date,sh})=>{
@@ -1524,12 +1553,24 @@ export default function App() {
                 return (
                   <div style={{marginTop:16}}>
                     <div style={{fontWeight:"700",fontSize:16,color:"#334155",marginBottom:10}}>⭐ המשמרות שלי</div>
-                    {myShiftList.map(({date,sh,shiftLabel,shiftIcon},i)=>{
+                    {myShiftList.map(({date,sh,shiftLabel,shiftIcon,isDuty,partner},i)=>{
                       const endDate=new Date(date); const [endH]=(sh.time.split("-")[1]?.split(":").map(Number)||[23]); endDate.setHours(endH,0,0,0);
                       const startDate=new Date(date); const [startH]=sh.time.split(":").map(Number); startDate.setHours(startH,0,0,0);
                       const isDone=endDate<now;
                       const isToday=now>=startDate&&now<=endDate;
                       const empNote=getEmpShiftNote(currentUser.id,date,sh.id);
+                      if (isDuty) return (
+                        <div key={i} style={{...S.card,border:"1.5px solid #a78bfa",marginBottom:8,display:"flex",alignItems:"center",gap:12,background:"#ede9fe",opacity:isDone?0.6:1}}>
+                          <div style={{width:42,height:42,borderRadius:10,background:"#c4b5fd",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{isDone?"✓":"⭐"}</div>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:15,fontWeight:"700",color:"#4c1d95"}}>שישי — תורנות</div>
+                            <div style={{fontSize:13,color:"#6d28d9",fontWeight:"500",marginTop:2}}>{sh.time}{partner?` • עם ${partner}`:""}</div>
+                          </div>
+                          <span style={{fontSize:12,padding:"3px 9px",borderRadius:20,fontWeight:"700",background:"#c4b5fd",color:"#4c1d95"}}>
+                            {isDone?"✓ הסתיים":isToday?"היום":"בקרוב"}
+                          </span>
+                        </div>
+                      );
                       return (
                         <div key={i} style={{...S.card,opacity:isDone?0.6:1,border:isDone?"1.5px solid #22c55e":isToday?"1.5px solid #378ADD":"1px solid #e2e8f0",marginBottom:8,display:"flex",alignItems:"center",gap:12,background:isDone?"#f0fdf4":"#fff"}}>
                           <div style={{width:42,height:42,borderRadius:10,background:isDone?"#dcfce7":["morning","open"].includes(sh.id)?"#FAEEDA":"#EEEDFE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:isDone?26:22,flexShrink:0}}>{isDone?"✓":shiftIcon}</div>
