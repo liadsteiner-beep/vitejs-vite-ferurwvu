@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
 
@@ -29,7 +29,6 @@ const ROLE_COLORS = {
   "פרח":  { bg: "#a855f7", light: "#f3e8ff", dark: "#7e22ce" },
 };
 
-// Budget — encoded to avoid casual reading (not shown to employees)
 const _B = atob("W3sibjoiXHU1ZTMwXHU1ZTFhIiwibWluIjo0LCJtYXgiOjV9LHsibjoiXHU1ZTIwXHU1ZGUwXHU1ZTA0IiwibWluIjo0LCJtYXgiOjR9LHsibjoiXHU1ZTI5XHU1ZTBhIiwibWluIjoyLCJtYXgiOjJ9LHsibjoiXHU1ZTViXHU1ZTFhXHU1ZGYyIiwibWluIjozLCJtYXgiOjR9LHsibjoiXHU1ZTI5XHU1ZGU3IiwibWluIjowLCJtYXgiOjB9LHsibm8iOiJcdTA1E1x1MDVENU5cdTA1NzQiLCJtaW4iOjAsIm1heCI6OTl9LHsibm8iOiJcdTA1NTRcdTA1RTFcdTA1RDkiLCJtaW4iOjAsIm1heCI6OTl9XQ==");
 const BUDGET = (() => {
   try {
@@ -62,7 +61,6 @@ const INITIAL_EMPLOYEES = [
   { id: 12, name: "לורין",  role: "פרח", phone: "" },
 ];
 
-// Day shift templates: dayOfWeek (0=Sun) -> shifts
 const DAY_SHIFTS = {
   0: [ { id:"morning", label:"בוקר", time:"08:30-16:00", timeFrach:"09:30-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב",   time:"16:00-23:00", timeFrach:"16:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
   1: [ { id:"morning", label:"בוקר", time:"08:30-16:00", timeFrach:"09:30-16:00", slots:{"רוקח":1,"פרח":1} }, { id:"evening", label:"ערב",   time:"16:00-23:00", timeFrach:"16:00-22:00", slots:{"רוקח":1,"פרח":1} } ],
@@ -73,7 +71,6 @@ const DAY_SHIFTS = {
   6: [ { id:"morning", label:"בוקר שבת", time:"10:00-16:30", timeFrach:"10:00-16:30", slots:{"רוקח":1,"פרח":0} }, { id:"evening", label:"ערב שבת",  time:"16:30-23:00", timeFrach:"18:00-23:00", slots:{"רוקח":1,"פרח":1} } ],
 };
 const SESSION_KEY = "pharmacy_session_v1";
-// Returns correct shift time based on role, with optional חריש בעיר override
 function getShiftTime(sh, role, customTime) {
   if (customTime) return customTime;
   return role === "פרח" && sh.timeFrach ? sh.timeFrach : sh.time;
@@ -90,16 +87,11 @@ function saveData(d) {
   fbSave(d);
 }
 
-// ─── DATE HELPERS ─────────────────────────────────────────────────────────────
-// Returns the start of the scheduling week:
-// - Before publish: next week (Sun after this week)
-// - After publish: week after next
-// - Thu/Fri/Sat: always one week further
 function getSchedulingWeekStart(offsetWeeks = 0) {
   const today = new Date();
-  const day = today.getDay(); // 0=Sun
+  const day = today.getDay();
   const sunday = new Date(today);
-  sunday.setDate(today.getDate() - day); // current week's Sunday
+  sunday.setDate(today.getDate() - day);
   sunday.setHours(0, 0, 0, 0);
   sunday.setDate(sunday.getDate() + offsetWeeks * 7);
   return sunday;
@@ -119,30 +111,25 @@ function formatDateShort(d) { return d.toLocaleDateString("he-IL", { day:"numeri
 function dateKey(d) { return d.toISOString().split("T")[0]; }
 function isFirstOfMonth(d) { return d.getDate() === 1; }
 
-// Deadline: next Tuesday 12:00 of the scheduling week
 function getDeadline(offsetWeeks = 0) {
-  // Deadline = Tuesday 12:00 of the week BEFORE the scheduling week
   const dates = getWeekDates(offsetWeeks);
-  const tuesday = new Date(dates[2]); // Tuesday of the scheduling week
+  const tuesday = new Date(dates[2]);
   tuesday.setHours(12, 0, 0, 0);
-  tuesday.setDate(tuesday.getDate() - 7); // Tuesday of the PREVIOUS week
+  tuesday.setDate(tuesday.getDate() - 7);
   return tuesday;
 }
 
 function isPastDeadline(offsetWeeks = 0) { return new Date() > getDeadline(offsetWeeks); }
 
-const WEEK_DATES = getWeekDates(0); // default for auto-assign algorithm
+const WEEK_DATES = getWeekDates(0);
 
 // ─── AUTO-ASSIGN ALGORITHM ───────────────────────────────────────────────────
 function autoAssign(employees, availability, fridayRota, assigned, weekDates) {
   const newAssigned = { ...assigned };
-
-  // Helper: get assigned for a slot
   const getA = (date, shiftId, role) => newAssigned[`${dateKey(date)}_${shiftId}_${role}`] || [];
   const setA = (date, shiftId, role, ids) => { newAssigned[`${dateKey(date)}_${shiftId}_${role}`] = ids; };
   const isAv = (empId, date, shiftId) => !!availability[`${empId}_${dateKey(date)}_${shiftId}`];
 
-  // Count assigned shifts per employee
   const countShifts = (empId) => {
     let total = 0, morning = 0, evening = 0;
     weekDates.forEach(date => {
@@ -160,25 +147,21 @@ function autoAssign(employees, availability, fridayRota, assigned, weekDates) {
     return { total, morning, evening };
   };
 
-  // Check if employee already works that day
   const worksToday = (empId, date) => {
     const dayShifts = DAY_SHIFTS[date.getDay()] || [];
     return dayShifts.some(sh => ROLES.some(role => getA(date, sh.id, role).includes(empId)));
   };
 
-  // Check morning-after-evening constraint
   const hadEveningYesterday = (empId, date) => {
     const prev = new Date(date); prev.setDate(prev.getDate() - 1);
     const prevShifts = DAY_SHIFTS[prev.getDay()] || [];
     return prevShifts.some(sh => (sh.id === "evening" || sh.id === "close") && ROLES.some(role => getA(prev, sh.id, role).includes(empId)));
   };
 
-  // 1. Apply Friday rota for pharmacists
   const friday = weekDates[5];
   const fridayDateLabel = friday.toLocaleDateString("he-IL",{day:"numeric",month:"numeric",year:"numeric"});
   const fridayEntry = fridayRota.find(r => r.date === fridayDateLabel);
   if (fridayEntry) {
-    // emp1 and emp2 are both assigned — open/close decided later in weekly schedule
     [fridayEntry.emp1, fridayEntry.emp2, fridayEntry.open, fridayEntry.close].filter(Boolean).forEach(name => {
       const emp = employees.find(e => e.name === name && e.role === "רוקח");
       if (emp) {
@@ -188,7 +171,6 @@ function autoAssign(employees, availability, fridayRota, assigned, weekDates) {
     });
   }
 
-  // 2. Drug closing on 1st of month: add ליעד to morning with note
   weekDates.forEach(date => {
     if (isFirstOfMonth(date)) {
       const lieadEmp = employees.find(e => e.name === "ליעד" && e.role === "רוקח");
@@ -201,27 +183,25 @@ function autoAssign(employees, availability, fridayRota, assigned, weekDates) {
     }
   });
 
-  // 3. Auto-assign pharmacists (skip Friday open/close which is done by rota)
   const pharmacists = employees.filter(e => e.role === "רוקח" && e.name !== "עדי");
 
   weekDates.forEach(date => {
     const dow = date.getDay();
     const dayShifts = DAY_SHIFTS[dow] || [];
     dayShifts.forEach(shift => {
-      if (dow === 5) return; // Friday handled by rota
+      if (dow === 5) return;
       const needed = shift.slots["רוקח"] || 0;
       if (!needed) return;
       const current = getA(date, shift.id, "רוקח");
       if (current.length >= needed) return;
 
-      // Score candidates
       const isMorning = shift.id === "morning" || shift.id === "open";
       const candidates = pharmacists
         .filter(emp => {
           if (current.includes(emp.id)) return false;
           if (!isAv(emp.id, date, shift.id)) return false;
           if (worksToday(emp.id, date)) return false;
-          if (isMorning && hadEveningYesterday(emp.id, date)) return false; // rule 4
+          if (isMorning && hadEveningYesterday(emp.id, date)) return false;
           const budget = BUDGET.find(b => b.name === emp.name);
           if (budget && budget.max === 0) return false;
           const { total } = countShifts(emp.id);
@@ -233,15 +213,12 @@ function autoAssign(employees, availability, fridayRota, assigned, weekDates) {
           const bB = BUDGET.find(x => x.name === b.name) || { min:0, max:99 };
           const cA = countShifts(a.id);
           const cB = countShifts(b.id);
-          // Balance morning/evening FIRST — most important rule
           const ratioA = isMorning ? cA.morning - cA.evening : cA.evening - cA.morning;
           const ratioB = isMorning ? cB.morning - cB.evening : cB.evening - cB.morning;
           if (ratioA !== ratioB) return ratioA - ratioB;
-          // Then prioritize those who need more shifts
           const needA = bA.min - cA.total;
           const needB = bB.min - cB.total;
           if (needB !== needA) return needB - needA;
-          // Finally balance total shifts
           return cA.total - cB.total;
         });
 
@@ -251,7 +228,6 @@ function autoAssign(employees, availability, fridayRota, assigned, weekDates) {
     });
   });
 
-  // 4. Auto-assign פרח
   const parchs = employees.filter(e => e.role === "פרח");
   weekDates.forEach(date => {
     const dow = date.getDay();
@@ -272,11 +248,9 @@ function autoAssign(employees, availability, fridayRota, assigned, weekDates) {
         .sort((a, b) => {
           const cA = countShifts(a.id);
           const cB = countShifts(b.id);
-          // Balance morning/evening first
           const ratioA = isMorning ? cA.morning - cA.evening : cA.evening - cA.morning;
           const ratioB = isMorning ? cB.morning - cB.evening : cB.evening - cB.morning;
           if (ratioA !== ratioB) return ratioA - ratioB;
-          // Then balance total
           return cA.total - cB.total;
         });
       if (candidates.length > 0) {
@@ -286,6 +260,37 @@ function autoAssign(employees, availability, fridayRota, assigned, weekDates) {
   });
 
   return newAssigned;
+}
+
+// ─── LONG PRESS HOOK ──────────────────────────────────────────────────────────
+function useLongPress(onLongPress, onClick, ms = 500) {
+  const timerRef = useRef(null);
+  const fired = useRef(false);
+
+  const start = useCallback((e) => {
+    fired.current = false;
+    timerRef.current = setTimeout(() => {
+      fired.current = true;
+      onLongPress(e);
+    }, ms);
+  }, [onLongPress, ms]);
+
+  const stop = useCallback((e) => {
+    clearTimeout(timerRef.current);
+    if (!fired.current && onClick) onClick(e);
+  }, [onClick]);
+
+  const cancel = useCallback(() => {
+    clearTimeout(timerRef.current);
+  }, []);
+
+  return {
+    onMouseDown: start,
+    onMouseUp: stop,
+    onMouseLeave: cancel,
+    onTouchStart: start,
+    onTouchEnd: stop,
+  };
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -298,17 +303,17 @@ export default function App() {
   const [employees, setEmployees]     = useState(INITIAL_EMPLOYEES);
   const [availability, setAvailability] = useState({});
   const [assigned, setAssigned]       = useState({});
-  const [notes, setNotes]             = useState({}); // empId_dateKey_shiftId -> note
-  const [empNotes, setEmpNotes]       = useState({}); // empId -> note to manager
-  const [empPasswords, setEmpPasswords] = useState({}); // empId -> password
+  const [notes, setNotes]             = useState({});
+  const [empNotes, setEmpNotes]       = useState({});
+  const [empPasswords, setEmpPasswords] = useState({});
   const [managerPassword, setManagerPassword] = useState(MANAGER_PASSWORD_DEFAULT);
   const [empPwInput, setEmpPwInput]   = useState("");
   const [empPwConfirm, setEmpPwConfirm] = useState("");
   const [empPwError, setEmpPwError]   = useState("");
-  const [selectedEmp, setSelectedEmp] = useState(null); // emp clicked on login screen
-  const [fridayRota, setFridayRota]   = useState([]); // [{name, shift, date}]
+  const [selectedEmp, setSelectedEmp] = useState(null);
+  const [fridayRota, setFridayRota]   = useState([]);
   const [published, setPublished]     = useState(false);
-  const [publishedWeekStart, setPublishedWeekStart] = useState(null); // dateKey of published week's Sunday
+  const [publishedWeekStart, setPublishedWeekStart] = useState(null);
   const [toast, setToast]             = useState(null);
   const [managerTab, setManagerTab]   = useState("assign");
   const [newEmpName, setNewEmpName]   = useState("");
@@ -318,20 +323,15 @@ export default function App() {
   const [fbLoaded, setFbLoaded] = useState(false);
   const [showAutoConfirm, setShowAutoConfirm] = useState(false);
   const [sendMode, setSendMode] = useState("personal");
-  // ברירת מחדל: offset 0 = שבוע נוכחי
-  // אם הסידור פורסם לשבוע הבא — מתחיל ב-offset 0 (עובד יראה שבוע נוכחי + אפשרות לשבוע הבא)
-  // ברירת מחדל: ראשון–שלישי = שבוע נוכחי (0), רביעי–שבת = שבוע הבא (1)
   const [weekOffset, setWeekOffset] = useState(new Date().getDay() >= 4 ? 1 : 0);
   const [vacations, setVacations] = useState({});
-  // Friday rota form state
   const [newRotaDate, setNewRotaDate] = useState("");
   const [newRotaOpen, setNewRotaOpen] = useState("");
   const [newRotaClose, setNewRotaClose] = useState("");
   const [empTab, setEmpTab] = useState("schedule");
   const [showNextWeek, setShowNextWeek] = useState(false);
-  const [schedView, setSchedView] = useState("list"); // unused — kept for compatibility
-  const [shiftModal, setShiftModal] = useState(null); // {title, date, shiftNote, emps[]}
-  // Vacation request form state (employee)
+  const [schedView, setSchedView] = useState("list");
+  const [shiftModal, setShiftModal] = useState(null);
   const [vacType, setVacType] = useState("יום בודד");
   const [vacStart, setVacStart] = useState("");
   const [vacEnd, setVacEnd] = useState("");
@@ -345,10 +345,10 @@ export default function App() {
   const currentRealWeekDates = getWeekDates(0);
   const nextWeekDates = getWeekDates(1);
   const nextWeekPublished = published;
-  const [dayRemarks, setDayRemarks] = useState({}); // dateKey -> ["הורדת מבצע", ...]
-  const [shiftNotes, setShiftNotes] = useState({}); // dateKey_shiftId -> string
-  const [empShiftNotes, setEmpShiftNotes] = useState({}); // empId_dateKey_shiftId -> string
-  const [changePwModal, setChangePwModal] = useState(null); // null | "manager" | empId
+  const [dayRemarks, setDayRemarks] = useState({});
+  const [shiftNotes, setShiftNotes] = useState({});
+  const [empShiftNotes, setEmpShiftNotes] = useState({});
+  const [changePwModal, setChangePwModal] = useState(null);
   const [changePwOld, setChangePwOld]     = useState("");
   const [changePwNew, setChangePwNew]     = useState("");
   const [changePwNew2, setChangePwNew2]   = useState("");
@@ -358,26 +358,30 @@ export default function App() {
   const lastEmpClickRef = useRef({id:null, time:0, date:null, sh:null});
   const [scheduleChanged, setScheduleChanged] = useState(false);
   const [showChangeModal, setShowChangeModal] = useState(false);
-  const [changeDetails, setChangeDetails] = useState([]); // what changed
-  const [timeEditModal, setTimeEditModal] = useState(null); // {id, name, date, sh, role}
+
+  // ── Time edit modal (long-press in assign / double-click in sim) ──
+  const [timeEditModal, setTimeEditModal] = useState(null);
+  // {empId, empName, date, shiftId, stVal, enVal}
 
   // ── Friday Duty System ──
-  const [dutyPeriod, setDutyPeriod] = useState(null);     // {start:"DD/MM/YYYY", end:"DD/MM/YYYY", quotas:{empId:n}}
-  const [dutyAvail, setDutyAvail] = useState({});          // {empId: {dateStr: true/false}}
-  const [dutyAssign, setDutyAssign] = useState([]);        // [{date, emp1, emp2}] — approved
+  const [dutyPeriod, setDutyPeriod] = useState(null);
+  const [dutyAvail, setDutyAvail] = useState({});
+  const [dutyAssign, setDutyAssign] = useState([]);
   const [dutyPublished, setDutyPublished] = useState(false);
-  const [dutyAvailOpen, setDutyAvailOpen] = useState(false); // employee sees availability form
-  const [dutySetupStep, setDutySetupStep] = useState(1);   // 1=setup 2=awaiting 3=assign 4=publish
-  const [dutyDraft, setDutyDraft] = useState([]);          // auto-assign draft before approval
+  const [dutyAvailOpen, setDutyAvailOpen] = useState(false);
+  const [dutySetupStep, setDutySetupStep] = useState(1);
+  const [dutyDraft, setDutyDraft] = useState([]);
 
-  // Enable pinch-to-zoom on the whole page
+  // Ref to hold latest empShiftNotes so Firebase snapshot doesn't overwrite user edits
+  const empShiftNotesRef = useRef({});
+  useEffect(() => { empShiftNotesRef.current = empShiftNotes; }, [empShiftNotes]);
+
   useEffect(() => {
     const meta = document.querySelector('meta[name="viewport"]');
     if (meta) meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
   }, []);
 
   useEffect(() => {
-    // Load from localStorage as fast fallback while Firebase loads
     const local = loadLocalData();
     if (local) {
       if (local.employees) {
@@ -395,8 +399,11 @@ export default function App() {
       if (local.publishedWeekStart) setPublishedWeekStart(local.publishedWeekStart);
       if (local.dayRemarks)   setDayRemarks(local.dayRemarks);
       if (local.shiftNotes)   setShiftNotes(local.shiftNotes);
+      if (local.empShiftNotes) {
+        setEmpShiftNotes(local.empShiftNotes);
+        empShiftNotesRef.current = local.empShiftNotes;
+      }
     }
-    // Real-time sync with Firebase
     let firstSnapshot = true;
     const unsub = onSnapshot(doc(db, "pharmacy", "schedule"), (snap) => {
       if (!snap.exists()) { setFbLoaded(true); return; }
@@ -406,7 +413,6 @@ export default function App() {
         if (!hasOldNames) setEmployees(d.employees);
       }
       if (firstSnapshot) {
-        // On first load, merge local availability with Firebase
         const mergedAv = { ...(d.availability||{}), ...(local?.availability||{}) };
         setAvailability(mergedAv);
         firstSnapshot = false;
@@ -421,7 +427,6 @@ export default function App() {
       if (d.fridayRota && d.fridayRota.length > 0) {
         setFridayRota(d.fridayRota);
       } else {
-        // Initialize with current friday rota data
         const initialRota = [
           { date:"5.6.2026",  emp1:"ליאן",  emp2:"סלאם" },
           { date:"12.6.2026", emp1:"ליאן",  emp2:"סג'א" },
@@ -441,7 +446,10 @@ export default function App() {
       if (d.dayRemarks)   setDayRemarks(d.dayRemarks);
       if (d.shiftNotes)   setShiftNotes(d.shiftNotes);
       if (d.vacations)    setVacations(d.vacations);
-      if (d.empShiftNotes) setEmpShiftNotes(d.empShiftNotes);
+      // Merge Firebase empShiftNotes with local edits — local wins
+      if (d.empShiftNotes) {
+        setEmpShiftNotes(prev => ({ ...d.empShiftNotes, ...empShiftNotesRef.current }));
+      }
       if (d.dutyPeriod)   setDutyPeriod(d.dutyPeriod);
       if (d.dutyAvail)    setDutyAvail(d.dutyAvail);
       if (d.dutyAssign)   setDutyAssign(d.dutyAssign);
@@ -449,35 +457,21 @@ export default function App() {
       if (d.dutyAvailOpen !== undefined) setDutyAvailOpen(d.dutyAvailOpen);
       if (d.dutySetupStep) setDutySetupStep(d.dutySetupStep);
       setFbLoaded(true);
-      // Detect schedule changes since last visit (for employee alert)
       if (d.assigned) {
         const CHANGE_KEY = "pharmacy_last_assigned";
         const lastSeen = localStorage.getItem(CHANGE_KEY);
         const currentHash = JSON.stringify(d.assigned);
         if (lastSeen && lastSeen !== currentHash) {
-          // Find what changed
-          const prev = JSON.parse(lastSeen);
-          const changes = [];
-          Object.keys({...prev,...d.assigned}).forEach(k => {
-            const prevIds = prev[k]||[];
-            const currIds = d.assigned[k]||[];
-            const added = currIds.filter(x=>!prevIds.includes(x));
-            const removed = prevIds.filter(x=>!currIds.includes(x));
-            if(added.length||removed.length) changes.push({k,added,removed});
-          });
           setScheduleChanged(true);
-          setChangeDetails(changes);
         }
         localStorage.setItem(CHANGE_KEY, currentHash);
       }
-      // Restore session
       const session = loadSession();
       if (session) {
         if (session.isManager) {
           setCurrentUser(session);
           setView("manager");
         } else {
-          // Verify employee still exists
           const emp = (d.employees||INITIAL_EMPLOYEES).find(e=>e.id===session.id);
           if (emp && d.empPasswords?.[emp.id]) {
             setCurrentUser({...emp,...session});
@@ -495,13 +489,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!fbLoaded) return; // Don't save before Firebase data is loaded
+    if (!fbLoaded) return;
     saveData({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes, dutyPeriod, dutyAvail, dutyAssign, dutyPublished, dutyAvailOpen, dutySetupStep });
   }, [employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes, dutyPeriod, dutyAvail, dutyAssign, dutyPublished, dutyAvailOpen, dutySetupStep]);
 
   function showToast(msg, type="ok") { setToast({msg,type}); setTimeout(()=>setToast(null),3000); }
 
-  // ── AUTH ──
   function loginManager() {
     if (pwInput === managerPassword) {
       setCurrentUser({isManager:true});
@@ -555,24 +548,23 @@ export default function App() {
   }
   function getRemarks(date) { return dayRemarks[dateKey(date)] || []; }
 
-  // ── VACATION HELPERS ──
   function addVacationRequest(empId, startDate, endDate, type, note) {
     const req = { id: Date.now(), start: startDate, end: endDate, type, note, status: "pending" };
     const updated = { ...vacations, [empId]: [...(vacations[empId]||[]), req] };
     setVacations(updated);
-    fbSave({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations: updated });
+    fbSave({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations: updated, empShiftNotes });
     showToast("בקשת חופשה נשלחה ✓");
   }
   function approveVacation(empId, vacId) {
     const updated = { ...vacations, [empId]: (vacations[empId]||[]).map(v => v.id===vacId?{...v,status:"approved"}:v) };
     setVacations(updated);
-    fbSave({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations: updated });
+    fbSave({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations: updated, empShiftNotes });
     showToast("חופשה אושרה ✓");
   }
   function rejectVacation(empId, vacId) {
     const updated = { ...vacations, [empId]: (vacations[empId]||[]).map(v => v.id===vacId?{...v,status:"rejected"}:v) };
     setVacations(updated);
-    fbSave({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations: updated });
+    fbSave({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations: updated, empShiftNotes });
     showToast("חופשה נדחתה", "err");
   }
   function parseDDMMYY(str) {
@@ -601,7 +593,34 @@ export default function App() {
   function setShiftNote(date, shiftId, val) { setShiftNotes(prev=>({...prev,[snKey(date,shiftId)]:val})); }
   const esnKey = (empId, date, shiftId) => `${empId}_${dateKey(date)}_${shiftId}`;
   function getEmpShiftNote(empId, date, shiftId) { return empShiftNotes[esnKey(empId,date,shiftId)] || ""; }
-  function setEmpShiftNote(empId, date, shiftId, val) { setEmpShiftNotes(prev=>({...prev,[esnKey(empId,date,shiftId)]:val})); }
+  function setEmpShiftNote(empId, date, shiftId, val) {
+    const key = esnKey(empId,date,shiftId);
+    setEmpShiftNotes(prev => {
+      const updated = {...prev, [key]: val};
+      empShiftNotesRef.current = updated;
+      return updated;
+    });
+  }
+
+  // Helper to get custom time for employee
+  function getEmpShiftTime(empId, date, shiftId) {
+    const st = getEmpShiftNote(empId, date, shiftId+"|st");
+    const en = getEmpShiftNote(empId, date, shiftId+"|en");
+    return st && en ? `${st}-${en}` : null;
+  }
+
+  // Open time edit modal
+  function openTimeEditModal(empId, date, shiftId) {
+    const emp = employees.find(e => e.id === empId);
+    setTimeEditModal({
+      empId,
+      empName: emp?.name || "",
+      date,
+      shiftId,
+      stVal: getEmpShiftNote(empId, date, shiftId+"|st") || "",
+      enVal: getEmpShiftNote(empId, date, shiftId+"|en") || "",
+    });
+  }
 
   // ── Friday Duty Helpers ──
   function parseDMY(str) {
@@ -626,19 +645,17 @@ export default function App() {
     const counts = {};
     Object.keys(quotas).forEach(id => counts[id]=0);
     const pharmacists = employees.filter(e=>e.role==="רוקח");
-    let lastTwo = []; // last two assigned emp ids
+    let lastTwo = [];
     for(const fri of fridays) {
       const dk = dutyDateKey(fri);
       const eligible = pharmacists.filter(e=>{
         const q = quotas[e.id]||0;
         if(counts[e.id]>=q) return false;
         const avl = (avail[e.id]||{})[dk];
-        return avl !== false; // default true if not set
+        return avl !== false;
       });
-      // prefer not consecutive
       const pref = eligible.filter(e=>!lastTwo.includes(e.id));
       const pool = pref.length>=2 ? pref : eligible;
-      // pick 2
       const picked = pool.slice(0,2);
       if(picked.length<2 && eligible.length>=2) picked.push(...eligible.filter(e=>!picked.includes(e)).slice(0,2-picked.length));
       const warn = picked.some(e=>lastTwo.includes(e.id));
@@ -668,7 +685,6 @@ export default function App() {
     showToast("סיסמה עודכנה ✓");
   }
 
-  // ── AVAILABILITY ──
   const avKey = (empId,date,shiftId) => `${empId}_${dateKey(date)}_${shiftId}`;
   const isAv  = (empId,date,shiftId) => !!availability[avKey(empId,date,shiftId)];
 
@@ -678,11 +694,9 @@ export default function App() {
     setAvailability(prev=>({...prev,[k]:!prev[k]}));
   }
 
-  // ── ASSIGN ──
   const aKey      = (date,shiftId,role) => `${dateKey(date)}_${shiftId}_${role}`;
   const getAssigned = (date,shiftId,role) => assigned[aKey(date,shiftId,role)]||[];
 
-  // empDisplayDates — show next week if nextWeekPublished and showNextWeek, else weekDates
   const empDisplayDates = showNextWeek && nextWeekPublished ? nextWeekDates : weekDates;
 
   function toggleAssign(date,shiftId,role,empId) {
@@ -691,7 +705,6 @@ export default function App() {
     const isAdding = !cur.includes(empId);
 
     if (isAdding) {
-      // Remove from other shifts on same day
       const dayShifts = DAY_SHIFTS[date.getDay()]||[];
       const newAssigned = {...assigned};
       dayShifts.forEach(sh => {
@@ -731,7 +744,7 @@ export default function App() {
   function handleDrop(toDate, toShiftId, toRole, toEmpId) {
     const from = dragRef.current;
     if (!from) return;
-    if (from.role !== toRole) return; // רק אותו תפקיד
+    if (from.role !== toRole) return;
 
     const fromKey = aKey(from.date, from.shiftId, from.role);
     const toKey   = aKey(toDate, toShiftId, toRole);
@@ -739,12 +752,10 @@ export default function App() {
     const toIds   = [...(assigned[toKey]||[])];
 
     if (toEmpId && toEmpId !== from.empId) {
-      // החלפה בין שני עובדים
       const newFrom = fromIds.map(id=>id===from.empId?toEmpId:id);
       const newTo   = toIds.map(id=>id===toEmpId?from.empId:id);
       setAssigned(prev=>({...prev,[fromKey]:newFrom,[toKey]:newTo}));
     } else if (!toEmpId) {
-      // העברה לתא ריק
       setAssigned(prev=>({
         ...prev,
         [fromKey]: fromIds.filter(id=>id!==from.empId),
@@ -761,7 +772,6 @@ export default function App() {
     showToast("שיבוץ אוטומטי הושלם ✓");
   }
 
-  // ── CSV UPLOAD ──
   function handleCSV(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -769,7 +779,7 @@ export default function App() {
     reader.onload = (ev) => {
       const lines = ev.target.result.split(/\r?\n/).filter(Boolean);
       const rota = [];
-      lines.slice(1).forEach(line => { // skip header
+      lines.slice(1).forEach(line => {
         const parts = line.split(",").map(s=>s.trim());
         if (parts.length>=3) rota.push({ date:parts[0], name:parts[1], shift:parts[2] });
       });
@@ -780,13 +790,11 @@ export default function App() {
     e.target.value="";
   }
 
-  // ── NOTES ──
   function saveEmpNote() {
     setEmpNotes(prev=>({...prev,[currentUser.id]:empNoteInput}));
     showToast("הערה נשמרה ✓");
   }
 
-  // ── STATS ──
   function getEmpStats(empId) {
     let morning=0, evening=0;
     weekDates.forEach(date=>{
@@ -802,7 +810,6 @@ export default function App() {
     return { morning, evening, total: morning+evening };
   }
 
-  // ── MISSING SLOTS ──
   function getMissingSlots() {
     const missing = [];
     weekDates.forEach(date=>{
@@ -817,7 +824,6 @@ export default function App() {
     return missing;
   }
 
-  // ── WHATSAPP ──
   function buildScheduleText() {
     let t = `📋 ${APP_NAME}\nשבוע ${formatDateShort(weekDates[0])}–${formatDateShort(weekDates[6])}\n\n`;
     weekDates.forEach(date=>{
@@ -847,7 +853,7 @@ export default function App() {
       dateFull: formatDateShort(date),
       dayObj: date,
     }));
-    const colW = Math.floor((1536-100)/7); // 1536px total, 100px for label col
+    const colW = Math.floor((1536-100)/7);
 
     const empBlock = (emp) => {
       const noteHtml = emp.note ? `<div style="font-size:22px;color:#334155;font-style:italic;margin-top:4px;">${emp.note}</div>` : "";
@@ -867,11 +873,7 @@ export default function App() {
     };
 
     let html = `<div style="direction:rtl;font-family:Segoe UI,Tahoma,Arial,sans-serif;background:#fff;">`;
-
-    // Table
     html += `<table style="border-collapse:collapse;width:100%;table-layout:fixed;background:#fff;">`;
-
-    // Header
     html += `<thead><tr>`;
     html += `<th style="width:100px;background:#1D9E75;border:0.5px solid #0F6E56;"></th>`;
     days.forEach(d => {
@@ -882,7 +884,6 @@ export default function App() {
     });
     html += `</tr></thead><tbody>`;
 
-    // Morning row
     html += `<tr>`;
     html += `<td style="background:#f0fdf4;border-right:5px solid #22c55e;border:0.5px solid #e2e8f0;text-align:center;vertical-align:middle;padding:12px 4px;">
       <div style="font-size:36px;">☀️</div>
@@ -894,18 +895,14 @@ export default function App() {
       const cs = ds.find(s=>s.id==="close");
       if (!ms && !cs) { html += `<td style="border:0.5px solid #e2e8f0;background:#f8fafc;text-align:center;color:#d1d5db;font-size:28px;vertical-align:middle;">—</td>`; return; }
       const emps = [
-        ...(ms ? getAssigned(dayObj,ms.id,"רוקח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:ms.time,note:getEmpShiftNote(id,dayObj,ms.id)})) : []),
-        ...(cs ? getAssigned(dayObj,cs.id,"רוקח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:cs.time,label:"סגירה",note:getEmpShiftNote(id,dayObj,cs.id)})) : []),
-        ...(ms ? getAssigned(dayObj,ms.id,"פרח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:getShiftTime(ms,"פרח"),note:getEmpShiftNote(id,dayObj,ms.id)})) : []),
+        ...(ms ? getAssigned(dayObj,ms.id,"רוקח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:getShiftTime(ms,"רוקח",getEmpShiftTime(id,dayObj,ms.id)),note:getEmpShiftNote(id,dayObj,ms.id)})) : []),
+        ...(cs ? getAssigned(dayObj,cs.id,"רוקח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:getShiftTime(cs,"רוקח",getEmpShiftTime(id,dayObj,cs.id)),label:"סגירה",note:getEmpShiftNote(id,dayObj,cs.id)})) : []),
+        ...(ms ? getAssigned(dayObj,ms.id,"פרח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:getShiftTime(ms,"פרח",getEmpShiftTime(id,dayObj,ms.id)),note:getEmpShiftNote(id,dayObj,ms.id)})) : []),
       ];
       html += shiftCell(emps, ms ? getShiftNote(dayObj,ms.id) : "");
     });
     html += `</tr>`;
-
-    // Divider
     html += `<tr><td colspan="8" style="background:#1e293b;height:6px;padding:0;border:none;"></td></tr>`;
-
-    // Evening row
     html += `<tr>`;
     html += `<td style="background:#f5f3ff;border-right:5px solid #6366f1;border:0.5px solid #e2e8f0;text-align:center;vertical-align:middle;padding:12px 4px;">
       <div style="font-size:36px;">🌙</div>
@@ -916,8 +913,8 @@ export default function App() {
       const es = ds.find(s=>s.id==="evening");
       if (!es) { html += `<td style="border:0.5px solid #e2e8f0;background:#f8fafc;text-align:center;color:#d1d5db;font-size:28px;vertical-align:middle;">—</td>`; return; }
       const emps = [
-        ...getAssigned(dayObj,es.id,"רוקח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:es.time,note:getEmpShiftNote(id,dayObj,es.id)})),
-        ...getAssigned(dayObj,es.id,"פרח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:getShiftTime(es,"פרח"),note:getEmpShiftNote(id,dayObj,es.id)})),
+        ...getAssigned(dayObj,es.id,"רוקח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:getShiftTime(es,"רוקח",getEmpShiftTime(id,dayObj,es.id)),note:getEmpShiftNote(id,dayObj,es.id)})),
+        ...getAssigned(dayObj,es.id,"פרח").map(id=>({name:employees.find(e=>e.id===id)?.name||"?",time:getShiftTime(es,"פרח",getEmpShiftTime(id,dayObj,es.id)),note:getEmpShiftNote(id,dayObj,es.id)})),
       ];
       html += shiftCell(emps, getShiftNote(dayObj,es.id));
     });
@@ -965,7 +962,6 @@ export default function App() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,"_blank");
   }
 
-  // ── WHO HASN'T SUBMITTED ──
   function notSubmitted() {
     return employees.filter(emp=>{
       const total = weekDates.reduce((acc,date)=>{
@@ -975,7 +971,6 @@ export default function App() {
     });
   }
 
-  // ── STYLES ──
   const S = {
     app:    { minHeight:"100vh", background:"#f1f5f9", fontFamily:"'Segoe UI',Tahoma,sans-serif", direction:"rtl", color:"#1e293b" },
     header: { background:"#1e293b", padding:"14px 18px", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:100, boxShadow:"0 2px 10px rgba(0,0,0,0.2)" },
@@ -994,6 +989,66 @@ export default function App() {
     toast:  (type)=>({ position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)", background:type==="err"?"#ef4444":"#22c55e", color:"#fff", padding:"12px 24px", borderRadius:"12px", fontWeight:"700", fontSize:"15px", zIndex:9999, boxShadow:"0 4px 20px rgba(0,0,0,0.2)", whiteSpace:"nowrap" }),
     sTitle: { fontWeight:"800", fontSize:"15px", color:"#334155", marginBottom:10 },
   };
+
+  // ── TIME EDIT MODAL COMPONENT ──
+  function TimeEditModal() {
+    const [st, setSt] = useState(timeEditModal.stVal);
+    const [en, setEn] = useState(timeEditModal.enVal);
+    return (
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{if(e.target===e.currentTarget)setTimeEditModal(null);}}>
+        <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:320,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+          <div style={{fontWeight:"800",fontSize:15,marginBottom:2}}>⏰ שינוי שעות</div>
+          <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>{timeEditModal.empName} — {formatDate(timeEditModal.date)}</div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>התחלה</div>
+              <input
+                style={{...S.input,width:"100%",fontSize:17,textAlign:"center",fontWeight:"700",direction:"ltr"}}
+                placeholder="08:30"
+                maxLength={5}
+                value={st}
+                onChange={e=>{
+                  let v=e.target.value.replace(/[^0-9:]/g,"");
+                  if(v.length===4&&!v.includes(":")) v=v.slice(0,2)+":"+v.slice(2);
+                  setSt(v);
+                }}
+              />
+            </div>
+            <span style={{fontSize:20,color:"#94a3b8",marginTop:16}}>—</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>סיום</div>
+              <input
+                style={{...S.input,width:"100%",fontSize:17,textAlign:"center",fontWeight:"700",direction:"ltr"}}
+                placeholder="16:00"
+                maxLength={5}
+                value={en}
+                onChange={e=>{
+                  let v=e.target.value.replace(/[^0-9:]/g,"");
+                  if(v.length===4&&!v.includes(":")) v=v.slice(0,2)+":"+v.slice(2);
+                  setEn(v);
+                }}
+              />
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button style={{...S.btn("#0ea5e9"),flex:2}} onClick={()=>{
+              setEmpShiftNote(timeEditModal.empId, timeEditModal.date, timeEditModal.shiftId+"|st", st);
+              setEmpShiftNote(timeEditModal.empId, timeEditModal.date, timeEditModal.shiftId+"|en", en);
+              setTimeEditModal(null);
+              showToast("שעות עודכנו ✓");
+            }}>שמור</button>
+            <button style={{...S.btn("#94a3b8"),flex:1}} onClick={()=>{
+              setEmpShiftNote(timeEditModal.empId, timeEditModal.date, timeEditModal.shiftId+"|st", "");
+              setEmpShiftNote(timeEditModal.empId, timeEditModal.date, timeEditModal.shiftId+"|en", "");
+              setTimeEditModal(null);
+              showToast("שעות אופסו ✓");
+            }}>אפס</button>
+            <button style={{...S.btn("#e2e8f0","#64748b"),flex:1}} onClick={()=>setTimeEditModal(null)}>ביטול</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ════════════ LOADING ════════════
   if (!fbLoaded) return (
@@ -1050,7 +1105,6 @@ export default function App() {
             ))}
           </div>
 
-          {/* Employee password modal */}
           {selectedEmp && (
             <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
               <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:340,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
@@ -1127,7 +1181,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Tab bar */}
           <div style={{display:"flex",background:"#f1f5f9",borderRadius:"10px",padding:3,gap:3,marginBottom:12}}>
             {published && <button style={{...S.tab(empTab==="schedule"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("schedule")}>📋 סידור</button>}
             <button style={{...S.tab(empTab==="avail"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("avail")}>✏️ זמינות</button>
@@ -1136,8 +1189,6 @@ export default function App() {
             <button style={{...S.tab(empTab==="note"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("note")}>📝 הערה</button>
           </div>
 
-
-          {/* Mobile schedule — single scrollable table */}
           {empTab==="schedule" && published && (
             <div style={{marginTop:4}}>
               {!showNextWeek && (
@@ -1145,7 +1196,6 @@ export default function App() {
                   📅 מציג: {formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}
                 </div>
               )}
-              {/* Change alert banner */}
               {scheduleChanged && !showChangeModal && (
                 <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10,cursor:"pointer"}} onClick={()=>{setShowChangeModal(true);setScheduleChanged(false);}}>
                   <div>
@@ -1204,7 +1254,6 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* הערות יום */}
                     <tr>
                       <td style={{background:"#f8fafc",padding:"3px 6px",borderLeft:"3px solid #1e293b",border:"0.5px solid #e2e8f0",fontSize:9,color:"#475569",textAlign:"center",position:"sticky",left:0,zIndex:1}}>📌</td>
                       {empDisplayDates.map(date=>{
@@ -1214,7 +1263,6 @@ export default function App() {
                         </td>;
                       })}
                     </tr>
-                    {/* בוקר */}
                     <tr>
                       <td style={{background:"#f0fdf4",padding:"6px 3px",borderLeft:"3px solid #22c55e",border:"0.5px solid #e2e8f0",textAlign:"center",verticalAlign:"middle",position:"sticky",left:0,zIndex:1}}>
                         <span style={{fontSize:16}}>☀️</span>
@@ -1240,9 +1288,7 @@ export default function App() {
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
-                              const st=getEmpShiftNote(id,date,sh.id+"|st");
-                              const en=getEmpShiftNote(id,date,sh.id+"|en");
-                              const customTime=st&&en?`${st}-${en}`:null;
+                              const customTime=getEmpShiftTime(id,date,sh.id);
                               const isHarish=n&&n.includes("חריש בעיר");
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):isHarish?"#fdf2f4":"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":isHarish?"#8b2a3a":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
@@ -1256,9 +1302,7 @@ export default function App() {
                         );
                       })}
                     </tr>
-                    {/* פס */}
                     <tr><td colSpan={empDisplayDates.length+1} style={{background:"#1e293b",height:4,padding:0,border:"none"}}></td></tr>
-                    {/* ערב */}
                     <tr>
                       <td style={{background:"#f5f3ff",padding:"6px 3px",borderLeft:"3px solid #6366f1",border:"0.5px solid #e2e8f0",textAlign:"center",verticalAlign:"middle",position:"sticky",left:0,zIndex:1}}>
                         <span style={{fontSize:16}}>🌙</span>
@@ -1282,9 +1326,7 @@ export default function App() {
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
-                              const st=getEmpShiftNote(id,date,sh.id+"|st");
-                              const en=getEmpShiftNote(id,date,sh.id+"|en");
-                              const customTime=st&&en?`${st}-${en}`:null;
+                              const customTime=getEmpShiftTime(id,date,sh.id);
                               const isHarish=n&&n.includes("חריש בעיר");
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):isHarish?"#fdf2f4":"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
                                 <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":isHarish?"#8b2a3a":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
@@ -1303,7 +1345,6 @@ export default function App() {
               </div>
               <div style={{fontSize:12,color:"#64748b",textAlign:"center",marginTop:8}}>לחצי על משמרת לפרטים • סובב לתצוגה מלאה</div>
 
-              {/* Download & Share buttons */}
               <div style={{display:"flex",gap:8,marginTop:10}}>
                 <button style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:11,borderRadius:10,border:"none",fontSize:13,fontWeight:"500",cursor:"pointer",background:"#E1F5EE",color:"#085041"}}
                   onClick={async()=>{
@@ -1348,7 +1389,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* ── רשימת המשמרות שלי ── */}
               {(()=>{
                 const MOOD_EMOJIS = ["😏","😌","☺️","😃","😇","🤩","🥳"];
                 const myShiftList = [];
@@ -1384,7 +1424,6 @@ export default function App() {
                 if(!total) return null;
                 return (
                   <div style={{marginTop:16}}>
-                    {/* Shift cards */}
                     <div style={{fontWeight:"700",fontSize:16,color:"#334155",marginBottom:10}}>⭐ המשמרות שלי</div>
                     {myShiftList.map(({date,sh,shiftLabel,shiftIcon},i)=>{
                       const endDate=new Date(date); const [endH]=(sh.time.split("-")[1]?.split(":").map(Number)||[23]); endDate.setHours(endH,0,0,0);
@@ -1397,7 +1436,7 @@ export default function App() {
                           <div style={{width:42,height:42,borderRadius:10,background:isDone?"#dcfce7":["morning","open"].includes(sh.id)?"#FAEEDA":"#EEEDFE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:isDone?26:22,flexShrink:0}}>{isDone?"✓":shiftIcon}</div>
                           <div style={{flex:1}}>
                             <div style={{fontSize:15,fontWeight:"700",color:isDone?"#15803d":"#1e293b"}}>{date.toLocaleDateString("he-IL",{weekday:"long"})} — {shiftLabel}</div>
-                            <div style={{fontSize:13,color:isDone?"#16a34a":"#475569",fontWeight:"500",marginTop:2}}>{getShiftTime(sh, myRole)}</div>
+                            <div style={{fontSize:13,color:isDone?"#16a34a":"#475569",fontWeight:"500",marginTop:2}}>{getShiftTime(sh, myRole, getEmpShiftTime(currentUser.id, date, sh.id))}</div>
                             {empNote&&<div style={{fontSize:11,color:"#64748b",fontStyle:"italic",marginTop:2}}>{empNote}</div>}
                           </div>
                           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
@@ -1410,7 +1449,6 @@ export default function App() {
                       );
                     })}
 
-                    {/* Progress bar */}
                     <div style={{...S.card,background:"#f8fafc",marginTop:8}}>
                       <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:10}}>
                         <div style={{fontSize:40,lineHeight:1,flexShrink:0}}>{moodEmoji}</div>
@@ -1442,9 +1480,9 @@ export default function App() {
               })()}
             </div>
           )}
+
           {(empTab==="avail" || !published) && (
           <div>
-          {/* Availability selection — weekly grid */}
           <div style={S.card}>
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:420,tableLayout:"fixed"}}>
@@ -1484,7 +1522,6 @@ export default function App() {
                           const onVac=isOnVacation(currentUser.id,date);
                           if(onVac) return <td key={dateKey(date)} style={{padding:"6px 4px",border:"0.5px solid #e2e8f0",textAlign:"center",background:"#d1fae5",fontSize:13}}>🌴</td>;
                           const active=isAv(currentUser.id,date,shift.id);
-                          const isBlue=shift.id==="morning"||shift.id==="open";
                           return (
                             <td key={dateKey(date)} style={{padding:"5px 4px",border:"0.5px solid #e2e8f0",textAlign:"center"}}>
                               <button
@@ -1510,21 +1547,23 @@ export default function App() {
               </table>
             </div>
           </div>
+          </div>)}
 
-          </div>)} {/* end avail tab */}
-
-          {/* Vacation tab */}
           {empTab==="vac" && (
           <div>
-
-          {/* Vacation board - all approved */}
           {(()=>{
             const today = new Date(); today.setHours(0,0,0,0);
             const parseDate = str => {
               if(!str) return null;
+              if(/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+                const [y,m,d] = str.split("-").map(Number);
+                return new Date(y, m-1, d);
+              }
               const sep = str.includes("/") ? "/" : str.includes(".") ? "." : null;
               if(!sep) return null;
-              const [d,m,y] = str.split(sep).map(s=>parseInt(s,10));
+              const parts = str.split(sep).map(s=>parseInt(s,10));
+              if(parts.length!==3 || parts.some(isNaN)) return null;
+              const [d,m,y] = parts;
               return new Date(y<100?y+2000:y, m-1, d);
             };
             const all = [];
@@ -1536,7 +1575,11 @@ export default function App() {
                 all.push({emp, v, startDate});
               });
             });
-            all.sort((a,b)=>(a.startDate||0)-(b.startDate||0));
+            all.sort((a,b)=>{
+              const ta = a.startDate ? a.startDate.getTime() : Infinity;
+              const tb = b.startDate ? b.startDate.getTime() : Infinity;
+              return ta - tb;
+            });
             if(!all.length) return null;
             return <div style={S.card}>
               <div style={S.sTitle}>📅 לוח חופשות — כל הצוות</div>
@@ -1555,8 +1598,6 @@ export default function App() {
               </div>
             </div>;
           })()}
-
-          {/* Vacation request */}
           <div style={S.card}>
             <div style={S.sTitle}>🌴 בקשת חופשה</div>
             {(vacations[currentUser.id]||[]).length>0 && (
@@ -1579,36 +1620,14 @@ export default function App() {
             <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
               <div style={{flex:1,minWidth:120}}>
                 <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>{vacType==="יום בודד"?"תאריך":"מתאריך"} (DD/MM/YYYY)</div>
-                <input
-                  type="text"
-                  placeholder="05/07/2026"
-                  maxLength={10}
-                  style={{...S.input,width:"100%",boxSizing:"border-box"}}
-                  value={vacStart}
-                  onChange={e=>{
-                    let v=e.target.value.replace(/[^0-9/]/g,"");
-                    if(v.length===2&&!v.includes("/")) v=v+"/";
-                    if(v.length===5&&v.split("/").length===2) v=v+"/";
-                    setVacStart(v);
-                  }}
-                />
+                <input type="text" placeholder="05/07/2026" maxLength={10} style={{...S.input,width:"100%",boxSizing:"border-box"}} value={vacStart}
+                  onChange={e=>{let v=e.target.value.replace(/[^0-9/]/g,"");if(v.length===2&&!v.includes("/"))v=v+"/";if(v.length===5&&v.split("/").length===2)v=v+"/";setVacStart(v);}}/>
               </div>
               {vacType==="טווח תאריכים" && (
                 <div style={{flex:1,minWidth:120}}>
                   <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>עד תאריך (DD/MM/YYYY)</div>
-                  <input
-                    type="text"
-                    placeholder="08/07/2026"
-                    maxLength={10}
-                    style={{...S.input,width:"100%",boxSizing:"border-box"}}
-                    value={vacEnd}
-                    onChange={e=>{
-                      let v=e.target.value.replace(/[^0-9/]/g,"");
-                      if(v.length===2&&!v.includes("/")) v=v+"/";
-                      if(v.length===5&&v.split("/").length===2) v=v+"/";
-                      setVacEnd(v);
-                    }}
-                  />
+                  <input type="text" placeholder="08/07/2026" maxLength={10} style={{...S.input,width:"100%",boxSizing:"border-box"}} value={vacEnd}
+                    onChange={e=>{let v=e.target.value.replace(/[^0-9/]/g,"");if(v.length===2&&!v.includes("/"))v=v+"/";if(v.length===5&&v.split("/").length===2)v=v+"/";setVacEnd(v);}}/>
                 </div>
               )}
             </div>
@@ -1620,15 +1639,11 @@ export default function App() {
               setVacStart("");setVacEnd("");setVacNote("");
             }}>שלח בקשת חופשה</button>
           </div>
+          </div>)}
 
-          </div>)} {/* end vac tab */}
-
-          {/* Duty tab - Friday availability and published schedule */}
           {empTab==="duty" && myRole==="רוקח" && (()=>{
             const fridays = dutyPeriod ? getFridaysInRange(parseDMY(dutyPeriod.start), parseDMY(dutyPeriod.end)) : [];
-            const myDuties = dutyPublished ? dutyAssign.filter(r=>r.emp1===currentUser.name||r.emp2===currentUser.name) : [];
             return <div>
-              {/* Availability form - open only when not published */}
               {dutyAvailOpen && !dutyPublished && <div style={S.card}>
                 <div style={S.sTitle}>⭐ סמן/י זמינות לתורנות שישי</div>
                 <div style={{fontSize:12,color:"#1D9E75",background:"#f0fdf4",border:"1px solid #86efac",borderRadius:7,padding:"7px 10px",marginBottom:12}}>
@@ -1650,8 +1665,6 @@ export default function App() {
                 </div>
                 <button style={{...S.btn("#1D9E75"),width:"100%",marginTop:12}} onClick={()=>showToast("זמינות נשמרה ✓")}>שמור זמינות</button>
               </div>}
-
-              {/* Published duties list */}
               {dutyPublished && <div style={S.card}>
                 <div style={S.sTitle}>⭐ תורנויות שישי — פורסם</div>
                 <div style={{display:"flex",flexDirection:"column",gap:7}}>
@@ -1669,31 +1682,21 @@ export default function App() {
                 </div>
                 <div style={{fontSize:11,color:"#7c3aed",textAlign:"center",padding:"6px",background:"#ede9fe",borderRadius:8,marginTop:10}}>🔒 נעול — לשינויים פנה/י למנהלת</div>
               </div>}
-
               {!dutyAvailOpen && !dutyPublished && <div style={{fontSize:13,color:"#94a3b8",textAlign:"center",padding:"30px 0"}}>תורנות שישי טרם נפתחה לסימון זמינות</div>}
             </div>;
           })()}
 
-          {/* Note tab */}
           {empTab==="note" && (
           <div>
-          {/* Note to manager */}
           <div style={S.card}>
             <div style={S.sTitle}>📝 הערה למנהל/ת (אופציונלי)</div>
             <textarea style={{...S.input,width:"100%",minHeight:70,resize:"vertical",marginBottom:8}} placeholder="כתוב/י כאן הערה למנהל/ת..." value={empNoteInput} onChange={e=>setEmpNoteInput(e.target.value)} />
             <button style={S.btn()} onClick={saveEmpNote}>שמור הערה</button>
           </div>
-
-          {/* Feedback */}
           <div style={S.card}>
             <div style={S.sTitle}>💡 רעיונות ומשוב על האפליקציה</div>
             <div style={{fontSize:12,color:"#64748b",marginBottom:8}}>מה דעתך? יש רעיון לשיפור? נשמח לשמוע!</div>
-            <textarea
-              style={{...S.input,width:"100%",minHeight:80,resize:"vertical",marginBottom:8}}
-              placeholder="כתוב/י כאן את המשוב שלך..."
-              id="emp-feedback-input"
-              defaultValue={empNotes[`feedback_${currentUser.id}`]||""}
-            />
+            <textarea style={{...S.input,width:"100%",minHeight:80,resize:"vertical",marginBottom:8}} placeholder="כתוב/י כאן את המשוב שלך..." id="emp-feedback-input" defaultValue={empNotes[`feedback_${currentUser.id}`]||""} />
             <button style={S.btn("#7e22ce")} onClick={()=>{
               const val = document.getElementById("emp-feedback-input").value.trim();
               if(!val) return;
@@ -1701,23 +1704,13 @@ export default function App() {
               showToast("משוב נשלח, תודה! 💜");
             }}>שלח משוב</button>
           </div>
-
-          {/* Phone number update */}
           <div style={S.card}>
             <div style={S.sTitle}>📱 מספר טלפון</div>
             <div style={{fontSize:12,color:"#64748b",marginBottom:8}}>
               {currentUser.phone ? `מספר נוכחי: ${currentUser.phone}` : "לא הוזן מספר טלפון עדיין"}
             </div>
             <div style={{display:"flex",gap:8}}>
-              <input
-                style={{...S.input,flex:1}}
-                type="tel"
-                placeholder="05XXXXXXXX"
-                maxLength={10}
-                defaultValue={currentUser.phone||""}
-                id="emp-phone-input"
-                onInput={e=>{e.target.value=e.target.value.replace(/[^0-9]/g,"");}}
-              />
+              <input style={{...S.input,flex:1}} type="tel" placeholder="05XXXXXXXX" maxLength={10} defaultValue={currentUser.phone||""} id="emp-phone-input" onInput={e=>{e.target.value=e.target.value.replace(/[^0-9]/g,"");}} />
               <button style={S.btn()} onClick={()=>{
                 const val = document.getElementById("emp-phone-input").value.trim();
                 if(!/^05\d{8}$/.test(val)) { showToast("מספר לא תקין — נא להזין 05XXXXXXXX","err"); return; }
@@ -1728,8 +1721,6 @@ export default function App() {
             </div>
             <div style={{fontSize:11,color:"#94a3b8",marginTop:5}}>פורמט: 05XXXXXXXX (10 ספרות, ללא מקפים)</div>
           </div>
-
-          {/* Calendar export — only shown when schedule is published */}
           {published && (()=>{
             const mySlots=[];
             weekDates.forEach(date=>{
@@ -1738,19 +1729,16 @@ export default function App() {
               });
             });
             if(!mySlots.length) return null;
-
             function exportICS() {
               const pad = n => String(n).padStart(2,"0");
-              function toICSDate(d, timeStr, offsetMins=0) {
+              function toICSDate(d, timeStr) {
                 const [h,m] = timeStr.split(":").map(Number);
-                const dt = new Date(d);
-                dt.setHours(h, m + offsetMins, 0, 0);
+                const dt = new Date(d); dt.setHours(h, m, 0, 0);
                 return `${dt.getFullYear()}${pad(dt.getMonth()+1)}${pad(dt.getDate())}T${pad(dt.getHours())}${pad(dt.getMinutes())}00`;
               }
               let ics = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//pharmacy-schedule//HE\nCALSCALE:GREGORIAN\n";
               mySlots.forEach(({date, sh},i)=>{
                 const [startT, endT] = sh.time.split("-");
-                // Handle overnight shifts (end < start means next day)
                 const [sh_end_h] = endT.split(":").map(Number);
                 const [sh_start_h] = startT.split(":").map(Number);
                 const endDate = sh_end_h < sh_start_h ? new Date(date.getTime()+86400000) : date;
@@ -1765,26 +1753,19 @@ export default function App() {
               ics += "END:VCALENDAR";
               const blob = new Blob([ics], {type:"text/calendar;charset=utf-8"});
               const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url; a.download = "משמרות.ics"; a.click();
+              const a = document.createElement("a"); a.href = url; a.download = "משמרות.ics"; a.click();
               URL.revokeObjectURL(url);
               showToast("קובץ יומן הורד ✓");
             }
-
             return (
               <div style={{...S.card,background:"#f0fdf4",border:"1px solid #86efac"}}>
                 <div style={S.sTitle}>📅 הוסף משמרות ליומן</div>
-                <div style={{fontSize:12,color:"#64748b",marginBottom:10}}>
-                  הורד קובץ .ics — פתח אותו בנייד כדי להוסיף לגוגל קלנדר, אאוטלוק, או יומן אפל
-                </div>
-                <button style={{...S.btn("#22c55e"),width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={exportICS}>
-                  📥 הורד למכשיר ({mySlots.length} משמרות)
-                </button>
+                <div style={{fontSize:12,color:"#64748b",marginBottom:10}}>הורד קובץ .ics — פתח אותו בנייד</div>
+                <button style={{...S.btn("#22c55e"),width:"100%"}} onClick={exportICS}>📥 הורד למכשיר ({mySlots.length} משמרות)</button>
               </div>
             );
           })()}
-
-          </div>)} {/* end note tab */}
+          </div>)}
 
           <div style={{textAlign:"center",color:"#94a3b8",fontSize:11,marginTop:4}}>נשמר אוטומטית</div>
           {empTab !== "schedule" && (
@@ -1795,29 +1776,18 @@ export default function App() {
           )}
         </div>
         {changePwModal && <ChangePwModal />}
+        {timeEditModal && <TimeEditModal />}
         {showChangeModal && (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget){setShowChangeModal(false);setScheduleChanged(false);}}}>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShowChangeModal(false);}}>
             <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:480}}>
               <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2,margin:"0 auto 16px"}}></div>
               <div style={{fontSize:18,fontWeight:"700",color:"#1e293b",marginBottom:4}}>🔔 עדכון לסידור</div>
-              <div style={{fontSize:13,color:"#64748b",marginBottom:14}}>השינויים מאז כניסתך האחרונה:</div>
-              <div style={{maxHeight:240,overflowY:"auto",marginBottom:12}}>
-                {changeDetails.length>0 ? changeDetails.slice(0,10).map((c,i)=>{
-                  const parts=c.k.split("_");
-                  const shiftId=parts[parts.length-1];
-                  const shiftLabel=["morning","open"].includes(shiftId)?"☀️ בוקר":"🌙 ערב";
-                  const dateStr=parts.slice(0,3).join("/");
-                  return <div key={i} style={{padding:"8px 12px",borderRadius:10,marginBottom:6,background:c.added.length?"#f0fdf4":"#fef2f2",border:`1px solid ${c.added.length?"#86efac":"#fca5a5"}`}}>
-                    <div style={{fontSize:13,fontWeight:"600",color:"#1e293b",marginBottom:3}}>{shiftLabel} {dateStr}</div>
-                    {c.added.map(id=><div key={id} style={{fontSize:12,color:"#15803d",fontWeight:"500"}}>➕ נוסף: {employees.find(e=>e.id===id)?.name||id}</div>)}
-                    {c.removed.map(id=><div key={id} style={{fontSize:12,color:"#dc2626",fontWeight:"500"}}>➖ הוסר: {employees.find(e=>e.id===id)?.name||id}</div>)}
-                  </div>;
-                }) : <div style={{fontSize:13,color:"#64748b",background:"#f8fafc",borderRadius:10,padding:"12px"}}>הסידור עודכן — עיין/י בטבלה לפרטים</div>}
+              <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>השיבוץ עודכן מאז כניסתך האחרונה</div>
+              <div style={{background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+                <div style={{fontSize:14,fontWeight:"600",color:"#92400e",marginBottom:4}}>💡 מה השתנה?</div>
+                <div style={{fontSize:13,color:"#78350f"}}>הסידור עודכן — עיין/י בטבלה לראות את השיבוץ הנוכחי.</div>
               </div>
-              <button style={{width:"100%",padding:13,border:"none",borderRadius:12,background:"#1D9E75",color:"#fff",fontSize:15,fontWeight:"700",cursor:"pointer"}}
-                onClick={()=>{setShowChangeModal(false);setScheduleChanged(false);}}>
-                הבנתי ✓
-              </button>
+              <button style={{width:"100%",padding:13,border:"none",borderRadius:12,background:"#1D9E75",color:"#fff",fontSize:15,fontWeight:"700",cursor:"pointer"}} onClick={()=>setShowChangeModal(false)}>הבנתי, הצג סידור</button>
             </div>
           </div>
         )}
@@ -1852,7 +1822,8 @@ export default function App() {
               <button style={{width:"100%",padding:13,border:"none",borderRadius:12,background:"#1e293b",color:"#fff",fontSize:14,fontWeight:"500",cursor:"pointer",marginTop:6}} onClick={()=>setShiftModal(null)}>סגור</button>
             </div>
           </div>
-        )}        {toast && <div style={S.toast(toast.type)}>{toast.msg}</div>}
+        )}
+        {toast && <div style={S.toast(toast.type)}>{toast.msg}</div>}
       </div>
     );
   }
@@ -1871,12 +1842,9 @@ export default function App() {
       <div style={S.header}>
         <div style={S.logo}>{APP_NAME} — מנהל/ת</div>
         <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-          {/* Week navigation */}
           <div style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.1)",borderRadius:"8px",padding:"3px 8px",direction:"rtl"}}>
             <button style={{background:"none",border:"none",color:"#f8fafc",cursor:"pointer",fontSize:16,padding:"0 4px"}} onClick={()=>setWeekOffset(w=>w-1)}>הקודם</button>
-            <span style={{fontSize:11,color:"#94a3b8",minWidth:110,textAlign:"center"}}>
-              {formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}
-            </span>
+            <span style={{fontSize:11,color:"#94a3b8",minWidth:110,textAlign:"center"}}>{formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}</span>
             <button style={{background:"none",border:"none",color:"#f8fafc",cursor:"pointer",fontSize:16,padding:"0 4px"}} onClick={()=>setWeekOffset(w=>w+1)}>הבא</button>
           </div>
           {missing.length>0 && <span style={{background:"#ef4444",color:"#fff",borderRadius:"20px",padding:"2px 10px",fontSize:12,fontWeight:"700"}}>⚠️ {missing.length} חסרים</span>}
@@ -1889,6 +1857,8 @@ export default function App() {
               if(d.assigned) setAssigned(d.assigned);
               if(d.empNotes) setEmpNotes(d.empNotes);
               if(d.vacations) setVacations(d.vacations);
+              // merge empShiftNotes — local wins
+              if(d.empShiftNotes) setEmpShiftNotes(prev=>({...d.empShiftNotes,...prev}));
               showToast("נתונים עודכנו ✓");
             });
           }}>🔄</button>
@@ -1908,10 +1878,10 @@ export default function App() {
         {/* ── SIMULATION TAB ── */}
         {managerTab==="simulation" && (
           <div>
-            {/* Vacation alerts — employees currently on vacation */}
             {(() => {
               const today = new Date();
               const todayKey = dateKey(today);
+              // Sort: salam last among approved vacations
               const onVacNow = employees.filter(emp =>
                 (vacations[emp.id]||[]).some(v => {
                   if(v.status!=="approved") return false;
@@ -1927,11 +1897,17 @@ export default function App() {
                   return end >= todayKey;
                 })
               );
-              if(!returning.length) return null;
+              // Sort so סלאם is last
+              const sortedReturning = [...returning].sort((a,b)=>{
+                if(a.name==="סלאם") return 1;
+                if(b.name==="סלאם") return -1;
+                return 0;
+              });
+              if(!sortedReturning.length) return null;
               return (
                 <div style={{...S.card, background:"#f0fdf4", border:"1px solid #86efac", marginBottom:14}}>
                   <div style={{fontWeight:"800",color:"#15803d",marginBottom:8}}>🌴 עובדים בחופשה</div>
-                  {returning.map(emp=>{
+                  {sortedReturning.map(emp=>{
                     const vac = (vacations[emp.id]||[]).find(v=>{
                       if(v.status!=="approved") return false;
                       const end = parseDDMMYY(v.end) || v.end;
@@ -1950,7 +1926,6 @@ export default function App() {
                 </div>
               );
             })()}
-            {/* Missing alerts */}
             {missing.length>0 && (
               <div style={S.alertCard}>
                 <div style={{fontWeight:"800",color:"#dc2626",marginBottom:8,fontSize:14}}>⚠️ משמרות חסרות ({missing.length})</div>
@@ -1962,9 +1937,8 @@ export default function App() {
               </div>
             )}
 
-            {/* Weekly table — scrollable with emp highlight */}
             <style>{`
-              .sim-emp { padding:2px 3px; border-radius:4px; margin-bottom:2px; cursor:pointer; transition:all 0.12s; }
+              .sim-emp { padding:2px 3px; border-radius:4px; margin-bottom:2px; cursor:pointer; transition:all 0.12s; user-select:none; }
               .sim-emp.hov { background:#dbeafe !important; outline:1.5px solid #3b82f6; }
               .sim-emp.hov .sim-name { color:#1d4ed8 !important; font-weight:700 !important; }
               .sim-emp.dim { opacity:0.18; }
@@ -1972,7 +1946,7 @@ export default function App() {
             `}</style>
             <div style={{fontSize:11,color:"#64748b",marginBottom:6,display:"flex",alignItems:"center",gap:8,background:"#f8fafc",border:"0.5px solid #e2e8f0",borderRadius:8,padding:"6px 10px"}}>
               <span style={{fontSize:13}}>👆</span>
-              <span>לחצי על שם להדגשת כל משמרותיו/ה</span>
+              <span>לחצי לחיצה בודדת להדגשה • לחיצה כפולה לעריכת שעות</span>
               {hoveredEmp && <button style={{marginRight:"auto",padding:"2px 8px",border:"0.5px solid #e2e8f0",borderRadius:6,background:"#fff",fontSize:11,color:"#64748b",cursor:"pointer"}} onClick={()=>setHoveredEmp(null)}>ניקוי</button>}
             </div>
             <div className="sim-scroll" style={{direction:"ltr"}}>
@@ -1989,7 +1963,6 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* הערות יום */}
                   <tr>
                     <td style={{background:"#f8fafc",padding:"3px 6px",borderLeft:"3px solid #1e293b",border:"0.5px solid #e2e8f0",fontSize:9,color:"#475569",textAlign:"center",position:"sticky",left:0,zIndex:1}}>📌</td>
                     {weekDates.map(date=>{
@@ -2021,15 +1994,17 @@ export default function App() {
                           const emp=employees.find(e=>e.id===id);
                           const isHov=hoveredEmp===id;
                           const n=getEmpShiftNote(id,date,sh.id);
+                          const customTime=getEmpShiftTime(id,date,sh.id);
                           return <div key={id}>
                             {i>0&&allEmps[i-1].sh.id!==sh.id&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
-                              onClick={()=>{
+                              onMouseDown={(e)=>{
                                 const now=Date.now();
                                 const last=lastEmpClickRef.current;
                                 if(last.id===id && now-last.time<400) {
-                                  // double click — open time edit modal
-                                  setTimeEditModal({id, name:emp?.name, date, sh, role:emp?.role||"רוקח"});
+                                  // double click — open time edit
+                                  e.preventDefault();
+                                  openTimeEditModal(id, date, sh.id);
                                   lastEmpClickRef.current={id:null,time:0};
                                 } else {
                                   // single click — highlight
@@ -2038,7 +2013,7 @@ export default function App() {
                                 }
                               }}>
                               <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:n&&n.includes("חריש בעיר")?"#8b2a3a":"#1e293b",display:"block"}}>{emp?.name}</span>
-                              <span style={{fontSize:11,color:n&&n.includes("חריש בעיר")?"#8b2a3a":"#334155",fontWeight:n&&n.includes("חריש בעיר")?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,emp?.role||"רוקח")}{label?` ${label}`:""}</span>
+                              <span style={{fontSize:11,color:n&&n.includes("חריש בעיר")?"#8b2a3a":"#334155",fontWeight:n&&n.includes("חריש בעיר")?"700":"600",display:"block",whiteSpace:"nowrap"}}>{customTime||getShiftTime(sh,emp?.role||"רוקח")}{label?` ${label}`:""}</span>
                               {n&&<span style={{fontSize:11,color:n.includes("חריש בעיר")?"#8b2a3a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${n.includes("חריש בעיר")?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
@@ -2048,7 +2023,6 @@ export default function App() {
                       </td>;
                     })}
                   </tr>
-                  {/* פס */}
                   <tr><td colSpan={weekDates.length+1} style={{background:"#1e293b",height:4,padding:0,border:"none"}}></td></tr>
                   {/* ערב */}
                   <tr>
@@ -2070,14 +2044,16 @@ export default function App() {
                           const emp=employees.find(e=>e.id===id);
                           const isHov=hoveredEmp===id;
                           const n=getEmpShiftNote(id,date,sh.id);
+                          const customTime=getEmpShiftTime(id,date,sh.id);
                           return <div key={id}>
                             {i>0&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
-                              onClick={()=>{
+                              onMouseDown={(e)=>{
                                 const now=Date.now();
                                 const last=lastEmpClickRef.current;
                                 if(last.id===id && now-last.time<400) {
-                                  setTimeEditModal({id, name:emp?.name, date, sh, role:emp?.role||"רוקח"});
+                                  e.preventDefault();
+                                  openTimeEditModal(id, date, sh.id);
                                   lastEmpClickRef.current={id:null,time:0};
                                 } else {
                                   setHoveredEmp(hoveredEmp===id?null:id);
@@ -2085,7 +2061,7 @@ export default function App() {
                                 }
                               }}>
                               <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:n&&n.includes("חריש בעיר")?"#8b2a3a":"#1e293b",display:"block"}}>{emp?.name}</span>
-                              <span style={{fontSize:11,color:n&&n.includes("חריש בעיר")?"#8b2a3a":"#334155",fontWeight:n&&n.includes("חריש בעיר")?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,emp?.role||"רוקח")}</span>
+                              <span style={{fontSize:11,color:n&&n.includes("חריש בעיר")?"#8b2a3a":"#334155",fontWeight:n&&n.includes("חריש בעיר")?"700":"600",display:"block",whiteSpace:"nowrap"}}>{customTime||getShiftTime(sh,emp?.role||"רוקח")}</span>
                               {n&&<span style={{fontSize:11,color:n.includes("חריש בעיר")?"#8b2a3a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${n.includes("חריש בעיר")?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
@@ -2099,7 +2075,6 @@ export default function App() {
               </table>
             </div>
 
-            {/* Download & Share */}
             <div style={{display:"flex",gap:8,marginTop:10}}>
               <button style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:11,borderRadius:10,border:"none",fontSize:13,fontWeight:"500",cursor:"pointer",background:"#E1F5EE",color:"#085041"}}
                 onClick={async()=>{
@@ -2146,14 +2121,13 @@ export default function App() {
           </div>
         )}
 
-
         {/* ── ASSIGN TAB ── */}
         {managerTab==="assign" && (
           <div>
             <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
               <button style={S.btn("#7e22ce")} onClick={()=>setShowAutoConfirm(true)}>⚡ שיבוץ אוטומטי</button>
               <button style={S.btnOut("#ef4444")} onClick={()=>{if(window.confirm("לאפס את כל השיבוצים?")) setAssigned({});}}>🗑️ אפס שיבוץ</button>
-              <span style={{fontSize:12,color:"#64748b"}}>שיבוץ ידני: לחץ/י על שם</span>
+              <span style={{fontSize:12,color:"#64748b"}}>לחיצה ארוכה על שם → עריכת שעות</span>
             </div>
 
             {showAutoConfirm && (
@@ -2167,7 +2141,6 @@ export default function App() {
               </div>
             )}
 
-            {/* Weekly assignment grid */}
             <div style={{overflowX:"auto",marginBottom:12}}>
               <table id="assign-table" style={{width:"100%",borderCollapse:"collapse",fontSize:12,background:"#fff",borderRadius:12,overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.08)",minWidth:500}}>
                 <thead>
@@ -2203,14 +2176,15 @@ export default function App() {
                           const isMissing=filled<needed;
                           return (
                             <td key={dateKey(date)} style={{padding:"4px",textAlign:"center",background:isMissing?"#fef2f2":"inherit",verticalAlign:"top",minWidth:80}}>
-                              {/* Shift note */}
                               {getShiftNote(date,shift.id)&&<div style={{fontSize:9,color:"#92400e",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginBottom:2}}>💬</div>}
-                              {/* Missing indicator */}
                               {isMissing&&<div style={{fontSize:9,color:"#ef4444",fontWeight:"700",marginBottom:2}}>⚠️ חסר</div>}
-                              {/* Assigned employees */}
                               <div style={{display:"flex",flexDirection:"column",gap:2,marginBottom:2}}>
                                 {assignedIds.map(id=>{
                                   const emp=employees.find(e=>e.id===id);
+                                  const customTime=getEmpShiftTime(id,date,shift.id);
+                                  // Long press handler for time edit
+                                  let pressTimer = null;
+                                  let pressFired = false;
                                   return (
                                     <div key={id} data-empid={id}
                                       onMouseEnter={()=>{
@@ -2220,6 +2194,7 @@ export default function App() {
                                       onMouseLeave={()=>{
                                         document.querySelectorAll(`[data-empid="${id}"]`).forEach(el=>el.classList.remove("emp-hov"));
                                         document.getElementById("assign-table")?.classList.remove("emp-hovering");
+                                        if(pressTimer) clearTimeout(pressTimer);
                                       }}>
                                       <button
                                         draggable
@@ -2228,10 +2203,31 @@ export default function App() {
                                         onDragOver={e=>e.preventDefault()}
                                         onDrop={e=>{ e.preventDefault(); handleDrop(date,shift.id,role,id); }}
                                         className="emp-btn emp-assigned"
-                                        onClick={()=>toggleAssign(date,shift.id,role,id)}
-                                        onDoubleClick={e=>{e.stopPropagation(); setTimeEditModal({id, name:emp?.name, date, sh:shift, role});}}
-                                        style={{borderRadius:"6px",padding:"3px 5px",fontSize:11,fontWeight:"700",color:"#14532d",cursor:"grab",width:"100%",transition:"all 0.15s",background:"#dcfce7",border:"2px solid #22c55e"}}>
+                                        onMouseDown={()=>{
+                                          pressFired=false;
+                                          pressTimer=setTimeout(()=>{
+                                            pressFired=true;
+                                            openTimeEditModal(id, date, shift.id);
+                                          }, 600);
+                                        }}
+                                        onMouseUp={()=>{
+                                          clearTimeout(pressTimer);
+                                          if(!pressFired) toggleAssign(date,shift.id,role,id);
+                                        }}
+                                        onTouchStart={()=>{
+                                          pressFired=false;
+                                          pressTimer=setTimeout(()=>{
+                                            pressFired=true;
+                                            openTimeEditModal(id, date, shift.id);
+                                          }, 600);
+                                        }}
+                                        onTouchEnd={(e)=>{
+                                          clearTimeout(pressTimer);
+                                          if(!pressFired) { e.preventDefault(); toggleAssign(date,shift.id,role,id); }
+                                        }}
+                                        style={{borderRadius:"6px",padding:"3px 5px",fontSize:11,fontWeight:"700",color:"#14532d",cursor:"grab",width:"100%",transition:"all 0.15s",background:"#dcfce7",border:"2px solid #22c55e",userSelect:"none"}}>
                                         ✓ {emp?.name}
+                                        {customTime && <span style={{display:"block",fontSize:9,color:"#0369a1",fontWeight:"600"}}>{customTime}</span>}
                                       </button>
                                       <input
                                         style={{width:"100%",fontSize:9,padding:"2px 4px",border:"1px solid #e2e8f0",borderRadius:4,color:"#475569",background:"#f8fafc",marginTop:1,boxSizing:"border-box"}}
@@ -2240,12 +2236,10 @@ export default function App() {
                                         onChange={e=>setEmpShiftNote(id,date,shift.id,e.target.value)}
                                         onClick={e=>e.stopPropagation()}
                                       />
-
                                     </div>
                                   );
                                 })}
                               </div>
-                              {/* Available to assign */}
                               <div style={{display:"flex",flexDirection:"column",gap:2}}
                                 onDragOver={e=>e.preventDefault()}
                                 onDrop={e=>{ e.preventDefault(); handleDrop(date,shift.id,role,null); }}>
@@ -2292,7 +2286,7 @@ export default function App() {
               </table>
             </div>
 
-            {/* Shift notes row */}
+            {/* Shift notes */}
             <div style={S.card}>
               <div style={S.sTitle}>💬 הערות משמרת + סימונים יומיים</div>
               {weekDates.map(date=>(
@@ -2324,7 +2318,6 @@ export default function App() {
         {/* ── PUBLISH TAB ── */}
         {managerTab==="publish" && (
           <div>
-            {/* Not submitted list */}
             {notSubmitted().length>0 && (
               <div style={S.alertCard}>
                 <div style={{fontWeight:"800",color:"#dc2626",marginBottom:8}}>⚠️ טרם השתבצו ({notSubmitted().length})</div>
@@ -2341,7 +2334,6 @@ export default function App() {
             <div style={S.card}>
               <div style={S.sTitle}>📤 שלח סידור</div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {/* Publish in app */}
                 <button style={{...S.btn(published?"#22c55e":"#0ea5e9"),padding:12,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{
                   setPublished(true);
                   const pubWeekStart = dateKey(weekDates[0]);
@@ -2354,13 +2346,10 @@ export default function App() {
                 }}>
                   {published?"✓ פורסם באפליקציה":"✅ פרסם באפליקציה לעובדים"}
                 </button>
-                {/* Download & Share image */}
                 <div style={{display:"flex",gap:8}}>
                   <button style={{flex:1,...S.btn("#085041"),padding:12,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
                     onClick={async()=>{
                       const {default:h2c} = await import("https://esm.sh/html2canvas@1.4.1");
-                      const wrap = document.getElementById("mgr-sched-capture");
-                      if(!wrap){showToast("גלול לסימולציה תחילה","err");return;}
                       const container = document.createElement("div");
                       container.style.cssText="position:absolute;top:0;left:-9999px;width:1584px;background:#f8fafc;font-family:Segoe UI,Tahoma,Arial,sans-serif;direction:rtl;padding:24px 48px;";
                       container.innerHTML = buildImageHTML();
@@ -2373,9 +2362,7 @@ export default function App() {
                       link.href = canvas.toDataURL("image/png");
                       link.click();
                       showToast("הסידור נשמר כתמונה ✓");
-                    }}>
-                    ⬇️ הורד סידור
-                  </button>
+                    }}>⬇️ הורד סידור</button>
                   <button style={{flex:1,...S.btn("#25D366"),padding:12,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
                     onClick={async()=>{
                       const {default:h2c} = await import("https://esm.sh/html2canvas@1.4.1");
@@ -2395,17 +2382,13 @@ export default function App() {
                         }
                         showToast("נשלח לווצאפ ✓");
                       });
-                    }}>
-                    📲 שתף
-                  </button>
+                    }}>📲 שתף</button>
                 </div>
               </div>
             </div>
 
-            {/* Per-employee whatsapp */}
             <div style={S.card}>
               <div style={S.sTitle}>📱 שלח לכל עובד בנפרד</div>
-              {/* Send mode toggle */}
               <div style={{display:"flex",gap:6,marginBottom:12,background:"#f1f5f9",borderRadius:8,padding:4}}>
                 <button style={{...S.tab(sendMode==="personal"),flex:1,borderRadius:6}} onClick={()=>setSendMode("personal")}>משמרות שלו בלבד</button>
                 <button style={{...S.tab(sendMode==="full"),flex:1,borderRadius:6}} onClick={()=>setSendMode("full")}>סידור מלא</button>
@@ -2433,12 +2416,7 @@ export default function App() {
                           ? <span style={{fontSize:11,color:"#22c55e",fontWeight:"700"}}>{stats.morning} בוקר • {stats.evening} ערב</span>
                           : <span style={{fontSize:11,color:"#94a3b8"}}>לא שובץ</span>}
                       </div>
-                      <button
-                        style={S.btnSm(emp.phone?"#25D366":"#94a3b8")}
-                        onClick={()=>emp.phone?openWhatsApp(emp.phone,txt):showToast("אין מספר טלפון","err")}
-                        title={emp.phone?"שלח ווצאפ":"הוסף מספר בהגדרות"}>
-                        📱
-                      </button>
+                      <button style={S.btnSm(emp.phone?"#25D366":"#94a3b8")} onClick={()=>emp.phone?openWhatsApp(emp.phone,txt):showToast("אין מספר טלפון","err")} title={emp.phone?"שלח ווצאפ":"הוסף מספר בהגדרות"}>📱</button>
                     </div>
                   );
                 })}
@@ -2447,7 +2425,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ── NOTES TAB ── */}
         {managerTab==="notes" && (
           <div>
             <div style={{color:"#64748b",fontSize:12,marginBottom:12}}>הערות שהוכנסו על ידי העובדים:</div>
@@ -2468,7 +2445,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ── FEEDBACK TAB ── */}
         {managerTab==="feedback" && (
           <div>
             <div style={{color:"#64748b",fontSize:13,marginBottom:14}}>משובים שהתקבלו מהעובדים:</div>
@@ -2497,15 +2473,12 @@ export default function App() {
           </div>
         )}
 
-        {/* ── VACATIONS TAB ── */}
         {managerTab==="vacations" && (
           <div>
-            {/* הוספה ידנית */}
             <div style={{...S.card, marginBottom:16}}>
               <div style={S.sTitle}>➕ הוסף חופשה ידנית</div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <select style={{...S.input,width:"100%"}}
-                  value={manualVacEmp} onChange={e=>setManualVacEmp(e.target.value)}>
+                <select style={{...S.input,width:"100%"}} value={manualVacEmp} onChange={e=>setManualVacEmp(e.target.value)}>
                   <option value="">בחר/י עובד/ת</option>
                   {employees.map(emp=><option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>)}
                 </select>
@@ -2517,29 +2490,16 @@ export default function App() {
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                   <div style={{flex:1,minWidth:120}}>
                     <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>{manualVacType==="יום בודד"?"תאריך":"מתאריך"} (DD/MM/YYYY)</div>
-                    <input style={{...S.input,width:"100%",boxSizing:"border-box"}} placeholder="05/07/2026" maxLength={10}
-                      value={manualVacStart} onChange={e=>{
-                        let v=e.target.value.replace(/[^0-9/]/g,"");
-                        if(v.length===2&&!v.includes("/")) v=v+"/";
-                        if(v.length===5&&v.split("/").length===2) v=v+"/";
-                        setManualVacStart(v);
-                      }}/>
+                    <input style={{...S.input,width:"100%",boxSizing:"border-box"}} placeholder="05/07/2026" maxLength={10} value={manualVacStart} onChange={e=>{let v=e.target.value.replace(/[^0-9/]/g,"");if(v.length===2&&!v.includes("/"))v=v+"/";if(v.length===5&&v.split("/").length===2)v=v+"/";setManualVacStart(v);}}/>
                   </div>
                   {manualVacType==="טווח תאריכים" && (
                     <div style={{flex:1,minWidth:120}}>
                       <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>עד תאריך (DD/MM/YYYY)</div>
-                      <input style={{...S.input,width:"100%",boxSizing:"border-box"}} placeholder="08/07/2026" maxLength={10}
-                        value={manualVacEnd} onChange={e=>{
-                          let v=e.target.value.replace(/[^0-9/]/g,"");
-                          if(v.length===2&&!v.includes("/")) v=v+"/";
-                          if(v.length===5&&v.split("/").length===2) v=v+"/";
-                          setManualVacEnd(v);
-                        }}/>
+                      <input style={{...S.input,width:"100%",boxSizing:"border-box"}} placeholder="08/07/2026" maxLength={10} value={manualVacEnd} onChange={e=>{let v=e.target.value.replace(/[^0-9/]/g,"");if(v.length===2&&!v.includes("/"))v=v+"/";if(v.length===5&&v.split("/").length===2)v=v+"/";setManualVacEnd(v);}}/>
                     </div>
                   )}
                 </div>
-                <input style={{...S.input,width:"100%",boxSizing:"border-box"}} placeholder="הערה (אופציונלי)"
-                  value={manualVacNote} onChange={e=>setManualVacNote(e.target.value)}/>
+                <input style={{...S.input,width:"100%",boxSizing:"border-box"}} placeholder="הערה (אופציונלי)" value={manualVacNote} onChange={e=>setManualVacNote(e.target.value)}/>
                 <button style={{...S.btn("#22c55e"),width:"100%"}} onClick={()=>{
                   if(!manualVacEmp||!manualVacStart){showToast("נא לבחור עובד ותאריך","err");return;}
                   const end = manualVacType==="יום בודד"?manualVacStart:manualVacEnd||manualVacStart;
@@ -2554,7 +2514,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Pending requests */}
             <div style={{fontWeight:"800",fontSize:14,marginBottom:10}}>⏳ בקשות ממתינות ({pendingVacations.length})</div>
             {pendingVacations.length===0 && <div style={{...S.card,color:"#94a3b8",textAlign:"center",padding:30}}>אין בקשות ממתינות</div>}
             {pendingVacations.map(req=>{
@@ -2580,13 +2539,15 @@ export default function App() {
               );
             })}
 
-            {/* Approved vacations board - chronological, no past */}
             <div style={{fontWeight:"800",fontSize:14,margin:"16px 0 10px"}}>✅ לוח חופשות מאושרות</div>
             {(()=>{
               const today = new Date(); today.setHours(0,0,0,0);
               const parseDate = str => {
                 if(!str) return null;
-                // Try splitting by / or . — format: D/M/YYYY or D.M.YYYY
+                if(/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+                  const [y,m,d] = str.split("-").map(Number);
+                  return new Date(y, m-1, d);
+                }
                 const sep = str.includes("/") ? "/" : str.includes(".") ? "." : null;
                 if(!sep) return null;
                 const parts = str.split(sep).map(s=>parseInt(s,10));
@@ -2595,18 +2556,21 @@ export default function App() {
                 const year = y < 100 ? y + 2000 : y;
                 return new Date(year, m-1, d);
               };
-              // Collect all approved vacations flat
               const all = [];
               employees.forEach(emp => {
                 (vacations[emp.id]||[]).filter(v=>v.status==="approved").forEach(v => {
                   const endDate = parseDate(v.type==="יום בודד" ? v.start : (v.end||v.start));
-                  if(endDate && endDate < today) return; // skip past
+                  if(endDate && endDate < today) return;
                   const startDate = parseDate(v.start);
                   all.push({emp, v, startDate, endDate});
                 });
               });
               // Sort chronologically
-              all.sort((a,b) => (a.startDate||0) - (b.startDate||0));
+              all.sort((a,b) => {
+                const ta = a.startDate ? a.startDate.getTime() : Infinity;
+                const tb = b.startDate ? b.startDate.getTime() : Infinity;
+                return ta - tb;
+              });
               if(!all.length) return <div style={{fontSize:13,color:"#94a3b8",padding:"12px 0"}}>אין חופשות מאושרות קרובות</div>;
               return all.map(({emp, v, startDate, endDate}) => {
                 const isNow = startDate && startDate <= today;
@@ -2631,20 +2595,15 @@ export default function App() {
           </div>
         )}
 
-        {/* ── FRIDAY DUTY TAB ── */}
         {managerTab==="duty" && (()=>{
           const fridays = dutyPeriod ? getFridaysInRange(parseDMY(dutyPeriod.start), parseDMY(dutyPeriod.end)) : [];
           const pharmacists = employees.filter(e=>e.role==="רוקח");
-
           return <div>
-            {/* Step tabs */}
             <div style={{display:"flex",gap:4,marginBottom:14,overflowX:"auto"}}>
               {[["1","הגדרה"],["2","זמינויות"],["3","שיבוץ"],["4","פרסום"]].map(([n,label])=>(
                 <button key={n} style={{...S.tab(dutySetupStep===parseInt(n)),flexShrink:0,padding:"8px 14px"}} onClick={()=>setDutySetupStep(parseInt(n))}>{n}. {label}</button>
               ))}
             </div>
-
-            {/* Step 1: Setup */}
             {dutySetupStep===1 && <div>
               <div style={S.card}>
                 <div style={S.sTitle}>📅 טווח תאריכים לתורנות שישי</div>
@@ -2666,17 +2625,13 @@ export default function App() {
                     />
                   </div>
                 ))}
-                <div style={{fontSize:12,color:"#64748b",marginTop:8}}>
-                  מוקצה: {Object.values(dutyPeriod?.quotas||{}).reduce((a,b)=>a+b,0)} / {fridays.length*2}
-                </div>
+                <div style={{fontSize:12,color:"#64748b",marginTop:8}}>מוקצה: {Object.values(dutyPeriod?.quotas||{}).reduce((a,b)=>a+b,0)} / {fridays.length*2}</div>
                 <button style={{...S.btn("#1D9E75"),width:"100%",marginTop:12}}
                   onClick={()=>{ setDutyAvailOpen(true); setDutySetupStep(2); fbSave({employees,availability,assigned,notes,empNotes,empPasswords,managerPassword,fridayRota,published,dayRemarks,shiftNotes,vacations,empShiftNotes,dutyPeriod,dutyAvail,dutyAssign,dutyPublished,dutyAvailOpen:true,dutySetupStep:2}); showToast("נשלח לרוקחים ✓"); }}>
                   ➤ שלח לרוקחים לסמן זמינות
                 </button>
               </div>}
             </div>}
-
-            {/* Step 2: View availabilities */}
             {dutySetupStep===2 && <div>
               <div style={S.card}>
                 <div style={S.sTitle}>זמינויות שהתקבלו</div>
@@ -2711,35 +2666,24 @@ export default function App() {
                 </button>
               </div>
             </div>}
-
-            {/* Step 3: Review & approve */}
             {dutySetupStep===3 && <div>
               <div style={S.card}>
                 <div style={S.sTitle}>שיבוץ לאישורך</div>
-                <div style={{fontSize:12,color:"#64748b",marginBottom:12}}>לחצי על שם לבחירה • פתיחה/סגירה תיקבע בסידור השבועי</div>
                 {(dutyDraft.length?dutyDraft:dutyAssign).map((row,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,border:`1px solid ${row.warn?"#fdba74":"#e2e8f0"}`,background:row.warn?"#fff7ed":"#fff",marginBottom:6}}>
                     <div style={{fontSize:14,fontWeight:"700",color:row.warn?"#92400e":"#475569",minWidth:60}}>{row.date}</div>
-                    <span style={{fontSize:14,fontWeight:"700",color:"#1e293b",cursor:"pointer",padding:"2px 6px",borderRadius:5}} onClick={()=>{}}>{row.emp1||"—"}</span>
+                    <span style={{fontSize:14,fontWeight:"700",color:"#1e293b"}}>{row.emp1||"—"}</span>
                     <span style={{color:"#cbd5e1",fontSize:12}}>•</span>
-                    <span style={{fontSize:14,fontWeight:"700",color:"#1e293b",cursor:"pointer",padding:"2px 6px",borderRadius:5}} onClick={()=>{}}>{row.emp2||"—"}</span>
+                    <span style={{fontSize:14,fontWeight:"700",color:"#1e293b"}}>{row.emp2||"—"}</span>
                     {row.warn && <span style={{marginRight:"auto",fontSize:13}}>⚠️</span>}
                   </div>
                 ))}
-                {(dutyDraft.length?dutyDraft:dutyAssign).some(r=>r.warn) && (
-                  <div style={{fontSize:12,color:"#b45309",background:"#fff7ed",borderRadius:8,padding:"8px 10px",marginBottom:10}}>⚠️ שבועיים ברצף — לא ניתן למנוע בשל מגבלות זמינות</div>
-                )}
                 <div style={{display:"flex",gap:8,marginTop:8}}>
                   <button style={{...S.btnOut("#64748b"),flex:1}} onClick={()=>setDutySetupStep(2)}>← חזרה</button>
-                  <button style={{...S.btn("#1D9E75"),flex:2}}
-                    onClick={()=>{ setDutyAssign(dutyDraft.length?dutyDraft:dutyAssign); setDutyDraft([]); setDutySetupStep(4); }}>
-                    ✓ אשרי שיבוץ
-                  </button>
+                  <button style={{...S.btn("#1D9E75"),flex:2}} onClick={()=>{ setDutyAssign(dutyDraft.length?dutyDraft:dutyAssign); setDutyDraft([]); setDutySetupStep(4); }}>✓ אשרי שיבוץ</button>
                 </div>
               </div>
             </div>}
-
-            {/* Step 4: Publish */}
             {dutySetupStep===4 && <div>
               <div style={S.card}>
                 <div style={S.sTitle}>פרסום תורנות שישי</div>
@@ -2765,10 +2709,8 @@ export default function App() {
           </div>;
         })()}
 
-        {/* ── SETTINGS TAB ── */}
         {managerTab==="settings" && (
           <div>
-            {/* Friday rota - manual entry */}
             <div style={S.card}>
               <div style={S.sTitle}>📅 תורנויות שישי</div>
               {fridayRota.length>0 && (
@@ -2786,14 +2728,14 @@ export default function App() {
                 <input style={{...S.input,width:"100%",boxSizing:"border-box"}} type="date" value={newRotaDate} onChange={e=>setNewRotaDate(e.target.value)} />
                 <div style={{display:"flex",gap:7}}>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>פתיחה (08:00-14:00)</div>
+                    <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>פתיחה</div>
                     <select style={{...S.input,width:"100%",boxSizing:"border-box"}} value={newRotaOpen} onChange={e=>setNewRotaOpen(e.target.value)}>
                       <option value="">— בחר/י —</option>
                       {employees.filter(e=>e.role==="רוקח").map(emp=><option key={emp.id} value={emp.name}>{emp.name}</option>)}
                     </select>
                   </div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>סגירה (14:00-20:00)</div>
+                    <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>סגירה</div>
                     <select style={{...S.input,width:"100%",boxSizing:"border-box"}} value={newRotaClose} onChange={e=>setNewRotaClose(e.target.value)}>
                       <option value="">— בחר/י —</option>
                       {employees.filter(e=>e.role==="רוקח").map(emp=><option key={emp.id} value={emp.name}>{emp.name}</option>)}
@@ -2812,7 +2754,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Employees */}
             <div style={S.card}>
               <div style={S.sTitle}>👥 עובדים</div>
               {ROLES.map(role=>(
@@ -2824,12 +2765,7 @@ export default function App() {
                       <div style={{display:"flex",gap:5,alignItems:"center"}}>
                         <input style={{...S.input,width:110,fontSize:12}} placeholder="טלפון" value={emp.phone||""} onChange={e=>setEmployees(prev=>prev.map(em=>em.id===emp.id?{...em,phone:e.target.value}:em))} />
                         {empPasswords[emp.id] && (
-                          <button style={S.btnSm("#f59e0b","#1e293b")} title="אפס סיסמה" onClick={()=>{
-                            if(window.confirm(`לאפס סיסמה של ${emp.name}?`)) {
-                              setEmpPasswords(prev=>{const n={...prev};delete n[emp.id];return n;});
-                              showToast(`סיסמת ${emp.name} אופסה ✓`);
-                            }
-                          }}>🔓 אפס</button>
+                          <button style={S.btnSm("#f59e0b","#1e293b")} onClick={()=>{if(window.confirm(`לאפס סיסמה של ${emp.name}?`)) { setEmpPasswords(prev=>{const n={...prev};delete n[emp.id];return n;}); showToast(`סיסמת ${emp.name} אופסה ✓`); }}}>🔓 אפס</button>
                         )}
                         <button style={S.btnSm("#ef4444")} onClick={()=>setEmployees(prev=>prev.filter(e=>e.id!==emp.id))}>✕</button>
                       </div>
@@ -2847,25 +2783,22 @@ export default function App() {
               </div>
             </div>
 
-            {/* Deadline info */}
             <div style={S.card}>
               <div style={S.sTitle}>⏰ נעילת שיבוץ</div>
               <div style={{fontSize:13,color:"#64748b"}}>
-                העובדים יכולים להשתבץ עד <strong>יום שלישי 12:00</strong>.<br/>
-                לאחר מכן — רק מנהל/ת יכול/ה לשנות.<br/>
+                עד <strong>יום שלישי 12:00</strong> — לאחר מכן רק מנהל/ת יכול/ה לשנות.<br/>
                 מועד נעילה הקרוב: <strong>{getDeadline().toLocaleString("he-IL")}</strong>
               </div>
-              <div style={{marginTop:8, fontSize:12, color:"#94a3b8"}}>
+              <div style={{marginTop:8,fontSize:12,color:"#94a3b8"}}>
                 סטטוס: {isPastDeadline() ? <span style={{color:"#ef4444",fontWeight:"700"}}>נעול</span> : <span style={{color:"#22c55e",fontWeight:"700"}}>פתוח</span>}
               </div>
             </div>
 
-            {/* Reset */}
             <div style={S.card}>
               <div style={S.sTitle}>⚠️ איפוס</div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 <button style={S.btn("#ef4444")} onClick={()=>{if(window.confirm("לאפס זמינויות ושיבוצים?")) {setAvailability({});setAssigned({});setPublished(false);showToast("אופס ✓");}}}>מחק זמינויות + שיבוצים</button>
-                <button style={S.btn("#94a3b8")} onClick={()=>{if(window.confirm("לאפס הערות עובדים?")) {setEmpNotes({});showToast("הערות נמחקו");}  }}>מחק הערות</button>
+                <button style={S.btn("#94a3b8")} onClick={()=>{if(window.confirm("לאפס הערות עובדים?")) {setEmpNotes({});showToast("הערות נמחקו");}}}>מחק הערות</button>
               </div>
             </div>
           </div>
@@ -2878,51 +2811,6 @@ export default function App() {
     </div>
   );
 
-  function TimeEditModal() {
-    const { id, name, date, sh, role } = timeEditModal;
-    const existing = getEmpShiftNote(id, date, sh.id+"|st");
-    const existingEnd = getEmpShiftNote(id, date, sh.id+"|en");
-    const defTime = getShiftTime(sh, role);
-    const [defSt, defEn] = defTime.split("-");
-    const [stVal, setStVal] = useState(existing || defSt || "");
-    const [enVal, setEnVal] = useState(existingEnd || defEn || "");
-    const fmt = v => { let s=v.replace(/[^0-9]/g,""); if(s.length>=3) s=s.slice(0,2)+":"+s.slice(2,4); return s; };
-    return (
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setTimeEditModal(null);}}>
-        <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:480,direction:"rtl"}}>
-          <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2,margin:"0 auto 16px"}}></div>
-          <div style={{fontSize:17,fontWeight:"700",color:"#1e293b",marginBottom:4}}>✏️ שינוי שעות — {name}</div>
-          <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>{sh.label} • {date?.toLocaleDateString?.("he-IL",{weekday:"short",day:"numeric",month:"numeric"})}</div>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-            <div style={{flex:1}}>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:4,textAlign:"center"}}>התחלה</div>
-              <input style={{width:"100%",fontSize:18,padding:"11px 10px",border:"1.5px solid #1D9E75",borderRadius:10,color:"#1e293b",fontWeight:"700",boxSizing:"border-box",direction:"ltr",textAlign:"center"}}
-                value={stVal} placeholder={defSt}
-                onChange={e=>setStVal(fmt(e.target.value))} maxLength={5}/>
-            </div>
-            <div style={{fontSize:22,color:"#94a3b8",fontWeight:"300",marginTop:18}}>—</div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:4,textAlign:"center"}}>סיום</div>
-              <input style={{width:"100%",fontSize:18,padding:"11px 10px",border:"1.5px solid #1D9E75",borderRadius:10,color:"#1e293b",fontWeight:"700",boxSizing:"border-box",direction:"ltr",textAlign:"center"}}
-                value={enVal} placeholder={defEn}
-                onChange={e=>setEnVal(fmt(e.target.value))} maxLength={5}/>
-            </div>
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <button style={{flex:1,padding:12,border:"1.5px solid #e2e8f0",borderRadius:10,background:"#f8fafc",color:"#64748b",fontSize:14,fontWeight:"700",cursor:"pointer"}}
-              onClick={()=>{ setEmpShiftNote(id,date,sh.id+"|st",""); setEmpShiftNote(id,date,sh.id+"|en",""); setTimeEditModal(null); showToast("שעות אופסו ✓"); }}>
-              אפס
-            </button>
-            <button style={{flex:2,padding:12,border:"none",borderRadius:10,background:"#1D9E75",color:"#fff",fontSize:14,fontWeight:"700",cursor:"pointer"}}
-              onClick={()=>{ if(stVal) setEmpShiftNote(id,date,sh.id+"|st",stVal); if(enVal) setEmpShiftNote(id,date,sh.id+"|en",enVal); setTimeEditModal(null); showToast("שעות עודכנו ✓"); }}>
-              שמור
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   function ChangePwModal() {
     const isManager = changePwModal === "manager";
     const emp = !isManager ? employees.find(e => e.id === changePwModal) : null;
@@ -2931,25 +2819,9 @@ export default function App() {
         <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:340,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
           <div style={{fontWeight:"800",fontSize:15,marginBottom:4}}>🔑 שינוי סיסמה</div>
           <div style={{fontSize:12,color:"#64748b",marginBottom:14}}>{isManager ? "מנהל/ת" : emp?.name}</div>
-          <input
-            style={{...S.input,width:"100%",marginBottom:8,boxSizing:"border-box",letterSpacing:"0.05em"}}
-            type="password" placeholder="סיסמה נוכחית"
-            value={changePwOld}
-            onChange={e=>{setChangePwOld(e.target.value);setChangePwErr("");}}
-          />
-          <input
-            style={{...S.input,width:"100%",marginBottom:8,boxSizing:"border-box",letterSpacing:"0.05em"}}
-            type="password" placeholder="סיסמה חדשה (לפחות 4 תווים)"
-            value={changePwNew}
-            onChange={e=>{setChangePwNew(e.target.value);setChangePwErr("");}}
-          />
-          <input
-            style={{...S.input,width:"100%",marginBottom:8,boxSizing:"border-box",letterSpacing:"0.05em"}}
-            type="password" placeholder="אימות סיסמה חדשה"
-            value={changePwNew2}
-            onChange={e=>{setChangePwNew2(e.target.value);setChangePwErr("");}}
-            onKeyDown={e=>e.key==="Enter"&&submitChangePw()}
-          />
+          <input style={{...S.input,width:"100%",marginBottom:8,boxSizing:"border-box",letterSpacing:"0.05em"}} type="password" placeholder="סיסמה נוכחית" value={changePwOld} onChange={e=>{setChangePwOld(e.target.value);setChangePwErr("");}} />
+          <input style={{...S.input,width:"100%",marginBottom:8,boxSizing:"border-box",letterSpacing:"0.05em"}} type="password" placeholder="סיסמה חדשה (לפחות 4 תווים)" value={changePwNew} onChange={e=>{setChangePwNew(e.target.value);setChangePwErr("");}} />
+          <input style={{...S.input,width:"100%",marginBottom:8,boxSizing:"border-box",letterSpacing:"0.05em"}} type="password" placeholder="אימות סיסמה חדשה" value={changePwNew2} onChange={e=>{setChangePwNew2(e.target.value);setChangePwErr("");}} onKeyDown={e=>e.key==="Enter"&&submitChangePw()} />
           {changePwErr && <div style={{color:"#ef4444",fontSize:12,fontWeight:"700",marginBottom:8}}>❌ {changePwErr}</div>}
           <div style={{display:"flex",gap:8}}>
             <button style={{...S.btn("#0ea5e9"),flex:1}} onClick={submitChangePw}>עדכן סיסמה</button>
