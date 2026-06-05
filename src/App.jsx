@@ -348,7 +348,6 @@ export default function App() {
   const [dayRemarks, setDayRemarks] = useState({}); // dateKey -> ["הורדת מבצע", ...]
   const [shiftNotes, setShiftNotes] = useState({}); // dateKey_shiftId -> string
   const [empShiftNotes, setEmpShiftNotes] = useState({}); // empId_dateKey_shiftId -> string
-  const [empShiftTimes, setEmpShiftTimes] = useState({}); // empId_dateKey_shiftId -> customTime (for חריש בעיר)
   const [changePwModal, setChangePwModal] = useState(null); // null | "manager" | empId
   const [changePwOld, setChangePwOld]     = useState("");
   const [changePwNew, setChangePwNew]     = useState("");
@@ -357,8 +356,6 @@ export default function App() {
   const [hoveredEmp, setHoveredEmp] = useState(null);
   const dragRef = useRef(null); // {empId, date, shiftId, role}
   const lastEmpClickRef = useRef({id:null, time:0, date:null, sh:null}); // for double-click
-  const longPressRef = useRef(null); // for long press timer
-  const [timeEditModal, setTimeEditModal] = useState(null); // {id, date, sh, currentTime}
   const [scheduleChanged, setScheduleChanged] = useState(false); // alert for employee
   const [showChangeModal, setShowChangeModal] = useState(false);
 
@@ -434,7 +431,6 @@ export default function App() {
       if (d.shiftNotes)   setShiftNotes(d.shiftNotes);
       if (d.vacations)    setVacations(d.vacations);
       if (d.empShiftNotes) setEmpShiftNotes(d.empShiftNotes);
-      if (d.empShiftTimes) setEmpShiftTimes(d.empShiftTimes);
       setFbLoaded(true);
       // Detect schedule changes since last visit (for employee alert)
       if (d.assigned) {
@@ -472,8 +468,8 @@ export default function App() {
 
   useEffect(() => {
     if (!fbLoaded) return; // Don't save before Firebase data is loaded
-    saveData({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes, empShiftTimes });
-  }, [employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes, empShiftTimes]);
+    saveData({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes });
+  }, [employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes]);
 
   function showToast(msg, type="ok") { setToast({msg,type}); setTimeout(()=>setToast(null),3000); }
 
@@ -578,8 +574,6 @@ export default function App() {
   const esnKey = (empId, date, shiftId) => `${empId}_${dateKey(date)}_${shiftId}`;
   function getEmpShiftNote(empId, date, shiftId) { return empShiftNotes[esnKey(empId,date,shiftId)] || ""; }
   function setEmpShiftNote(empId, date, shiftId, val) { setEmpShiftNotes(prev=>({...prev,[esnKey(empId,date,shiftId)]:val})); }
-  function getEmpShiftTime(empId, date, shiftId) { return empShiftTimes[esnKey(empId,date,shiftId)] || ""; }
-  function setEmpShiftTimeVal(empId, date, shiftId, val) { setEmpShiftTimes(prev=>({...prev,[esnKey(empId,date,shiftId)]:val})); }
 
   function openChangePw() {
     setChangePwModal(currentUser.isManager ? "manager" : currentUser.id);
@@ -1141,7 +1135,7 @@ export default function App() {
                       {empDisplayDates.map(date=>{
                         const remarks=getRemarks(date);
                         return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:3,background:"#fff",textAlign:"center"}}>
-                          {remarks.length>0&&<span style={{display:"inline-block",border:"1.5px solid #1e293b",borderRadius:4,padding:"1px 4px",fontSize:9,fontWeight:"500",color:"#1e293b",width:"100%"}}>{remarks.join(" | ")}</span>}
+                          {remarks.length>0&&<span style={{display:"inline-block",border:"1.5px solid #7c3aed",borderRadius:4,padding:"1px 4px",fontSize:9,fontWeight:"600",color:"#6d28d9",background:"#ede9fe",width:"100%"}}>{remarks.join(" | ")}</span>}
                         </td>;
                       })}
                     </tr>
@@ -1171,12 +1165,11 @@ export default function App() {
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
-                              const ct=getEmpShiftTime(id,date,sh.id);
                               const isHarish=n&&n.includes("חריש בעיר");
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):isHarish?"#fdf2f4":"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
-                                <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":isHarish?"#6b1a2a":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:11,color:isHarish?"#6b1a2a":"#334155",fontWeight:isHarish?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role,ct)}{label?` ${label}`:""}</span>
-                                {n&&<span style={{fontSize:11,color:isHarish?"#6b1a2a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${isHarish?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1,whiteSpace:"nowrap"}}>{n}</span>}
+                                <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":isHarish?"#8b2a3a":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
+                                <span style={{fontSize:11,color:isHarish?"#8b2a3a":"#334155",fontWeight:isHarish?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role)}{label?` ${label}`:""}</span>
+                                {n&&<span style={{fontSize:11,color:isHarish?"#8b2a3a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${isHarish?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1,whiteSpace:"nowrap"}}>{n}</span>}
                               </div>;
                             })}
                             {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
@@ -1211,12 +1204,11 @@ export default function App() {
                               const emp=employees.find(e=>e.id===id);
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
-                              const ct=getEmpShiftTime(id,date,sh.id);
                               const isHarish=n&&n.includes("חריש בעיר");
                               return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):isHarish?"#fdf2f4":"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
-                                <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":isHarish?"#6b1a2a":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:11,color:isHarish?"#6b1a2a":"#334155",fontWeight:isHarish?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role,ct)}</span>
-                                {n&&<span style={{fontSize:11,color:isHarish?"#6b1a2a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${isHarish?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
+                                <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":isHarish?"#8b2a3a":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
+                                <span style={{fontSize:11,color:isHarish?"#8b2a3a":"#334155",fontWeight:isHarish?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role)}</span>
+                                {n&&<span style={{fontSize:11,color:isHarish?"#8b2a3a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${isHarish?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
                               </div>;
                             })}
                             {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
@@ -1819,7 +1811,7 @@ export default function App() {
                     {weekDates.map(date=>{
                       const remarks=getRemarks(date);
                       return <td key={dateKey(date)} style={{border:"0.5px solid #e2e8f0",padding:3,background:"#fff",textAlign:"center"}}>
-                        {remarks.length>0&&<span style={{display:"inline-block",border:"1.5px solid #1e293b",borderRadius:4,padding:"1px 4px",fontSize:9,fontWeight:"500",color:"#1e293b",width:"100%"}}>{remarks.join(" | ")}</span>}
+                        {remarks.length>0&&<span style={{display:"inline-block",border:"1.5px solid #7c3aed",borderRadius:4,padding:"1px 4px",fontSize:9,fontWeight:"600",color:"#6d28d9",background:"#ede9fe",width:"100%"}}>{remarks.join(" | ")}</span>}
                       </td>;
                     })}
                   </tr>
@@ -1848,9 +1840,6 @@ export default function App() {
                           return <div key={id}>
                             {i>0&&allEmps[i-1].sh.id!==sh.id&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
-                              onPointerDown={()=>{ longPressRef.current=setTimeout(()=>{ longPressRef.current=null; setTimeEditModal({id,date,sh,role:emp?.role||"רוקח",currentTime:getEmpShiftTime(id,date,sh.id)||getShiftTime(sh,emp?.role||"רוקח")}); },600); }}
-                              onPointerUp={()=>{ if(longPressRef.current){clearTimeout(longPressRef.current);longPressRef.current=null;} }}
-                              onPointerLeave={()=>{ if(longPressRef.current){clearTimeout(longPressRef.current);longPressRef.current=null;} }}
                               onClick={()=>{
                                 const now=Date.now();
                                 const last=lastEmpClickRef.current;
@@ -1864,9 +1853,9 @@ export default function App() {
                                   lastEmpClickRef.current={id,time:now};
                                 }
                               }}>
-                              <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:n&&n.includes("חריש בעיר")?"#6b1a2a":"#1e293b",display:"block"}}>{emp?.name}</span>
-                              <span style={{fontSize:11,color:n&&n.includes("חריש בעיר")?"#6b1a2a":"#334155",fontWeight:n&&n.includes("חריש בעיר")?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,emp?.role||"רוקח",getEmpShiftTime(id,date,sh.id))}{label?` ${label}`:""}</span>
-                              {n&&<span style={{fontSize:11,color:n.includes("חריש בעיר")?"#6b1a2a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${n.includes("חריש בעיר")?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
+                              <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:n&&n.includes("חריש בעיר")?"#8b2a3a":"#1e293b",display:"block"}}>{emp?.name}</span>
+                              <span style={{fontSize:11,color:n&&n.includes("חריש בעיר")?"#8b2a3a":"#334155",fontWeight:n&&n.includes("חריש בעיר")?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,emp?.role||"רוקח")}{label?` ${label}`:""}</span>
+                              {n&&<span style={{fontSize:11,color:n.includes("חריש בעיר")?"#8b2a3a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${n.includes("חריש בעיר")?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
                         })}
@@ -1900,9 +1889,6 @@ export default function App() {
                           return <div key={id}>
                             {i>0&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
-                              onPointerDown={()=>{ longPressRef.current=setTimeout(()=>{ longPressRef.current=null; setTimeEditModal({id,date,sh,role:emp?.role||"רוקח",currentTime:getEmpShiftTime(id,date,sh.id)||getShiftTime(sh,emp?.role||"רוקח")}); },600); }}
-                              onPointerUp={()=>{ if(longPressRef.current){clearTimeout(longPressRef.current);longPressRef.current=null;} }}
-                              onPointerLeave={()=>{ if(longPressRef.current){clearTimeout(longPressRef.current);longPressRef.current=null;} }}
                               onClick={()=>{
                                 const now=Date.now();
                                 const last=lastEmpClickRef.current;
@@ -1914,9 +1900,9 @@ export default function App() {
                                   lastEmpClickRef.current={id,time:now};
                                 }
                               }}>
-                              <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:n&&n.includes("חריש בעיר")?"#6b1a2a":"#1e293b",display:"block"}}>{emp?.name}</span>
-                              <span style={{fontSize:11,color:n&&n.includes("חריש בעיר")?"#6b1a2a":"#334155",fontWeight:n&&n.includes("חריש בעיר")?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,emp?.role||"רוקח",getEmpShiftTime(id,date,sh.id))}</span>
-                              {n&&<span style={{fontSize:11,color:n.includes("חריש בעיר")?"#6b1a2a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${n.includes("חריש בעיר")?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
+                              <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:n&&n.includes("חריש בעיר")?"#8b2a3a":"#1e293b",display:"block"}}>{emp?.name}</span>
+                              <span style={{fontSize:11,color:n&&n.includes("חריש בעיר")?"#8b2a3a":"#334155",fontWeight:n&&n.includes("חריש בעיר")?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,emp?.role||"רוקח")}</span>
+                              {n&&<span style={{fontSize:11,color:n.includes("חריש בעיר")?"#8b2a3a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${n.includes("חריש בעיר")?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
                         })}
@@ -2069,15 +2055,7 @@ export default function App() {
                                         onChange={e=>setEmpShiftNote(id,date,shift.id,e.target.value)}
                                         onClick={e=>e.stopPropagation()}
                                       />
-                                      {getEmpShiftNote(id,date,shift.id).includes("חריש בעיר") && (
-                                        <input
-                                          style={{width:"100%",fontSize:9,padding:"2px 4px",border:"1px solid #a78bfa",borderRadius:4,color:"#6d28d9",background:"#ede9fe",marginTop:2,boxSizing:"border-box",fontWeight:"600"}}
-                                          placeholder="שעות חריש בעיר (למשל 11-16)"
-                                          value={getEmpShiftTime(id,date,shift.id)}
-                                          onChange={e=>setEmpShiftTimeVal(id,date,shift.id,e.target.value)}
-                                          onClick={e=>e.stopPropagation()}
-                                        />
-                                      )}
+
                                     </div>
                                   );
                                 })}
@@ -2478,7 +2456,7 @@ export default function App() {
                 <div style={{marginBottom:12}}>
                   {fridayRota.map((r,i)=>(
                     <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #f1f5f9",fontSize:13}}>
-                      <span><strong>{r.date}</strong> — פתיחה: {r.open||"—"} | סגירה: {r.close||"—"}</span>
+                      <span><strong>{r.date}</strong> — {r.emp1||r.open||"—"} + {r.emp2||r.close||"—"}</span>
                       <button style={S.btnSm("#ef4444")} onClick={()=>setFridayRota(prev=>prev.filter((_,j)=>j!==i))}>✕</button>
                     </div>
                   ))}
@@ -2576,60 +2554,6 @@ export default function App() {
       </div>
 
       {changePwModal && <ChangePwModal />}
-      {timeEditModal && (()=>{
-        const defaultTime = getShiftTime(timeEditModal.sh, timeEditModal.role);
-        const existing = getEmpShiftTime(timeEditModal.id, timeEditModal.date, timeEditModal.sh.id);
-        const [start, end] = (existing || defaultTime).split("-");
-        // Use local state via key trick — each open gets fresh inputs
-        return (
-          <div key={`${timeEditModal.id}_${dateKey(timeEditModal.date)}_${timeEditModal.sh.id}`}
-            style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
-            onClick={e=>{if(e.target===e.currentTarget)setTimeEditModal(null);}}>
-            <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:480,direction:"rtl"}}>
-              <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2,margin:"0 auto 16px"}}></div>
-              <div style={{fontSize:17,fontWeight:"700",color:"#1e293b",marginBottom:4}}>✏️ שינוי שעות משמרת</div>
-              <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>
-                {employees.find(e=>e.id===timeEditModal.id)?.name} • {timeEditModal.sh.label} • {timeEditModal.date.toLocaleDateString("he-IL",{weekday:"short",day:"numeric",month:"numeric"})}
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,color:"#64748b",marginBottom:4,textAlign:"center"}}>התחלה</div>
-                  <input id="te-start"
-                    style={{width:"100%",fontSize:18,padding:"11px 10px",border:"1.5px solid #1D9E75",borderRadius:10,color:"#1e293b",fontWeight:"700",boxSizing:"border-box",direction:"ltr",textAlign:"center"}}
-                    defaultValue={start||""}
-                    placeholder="08:30"
-                  />
-                </div>
-                <div style={{fontSize:22,color:"#94a3b8",fontWeight:"300",marginTop:18}}>—</div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,color:"#64748b",marginBottom:4,textAlign:"center"}}>סיום</div>
-                  <input id="te-end"
-                    style={{width:"100%",fontSize:18,padding:"11px 10px",border:"1.5px solid #1D9E75",borderRadius:10,color:"#1e293b",fontWeight:"700",boxSizing:"border-box",direction:"ltr",textAlign:"center"}}
-                    defaultValue={end||""}
-                    placeholder="16:00"
-                  />
-                </div>
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button style={{flex:1,padding:12,border:"1.5px solid #e2e8f0",borderRadius:10,background:"#f8fafc",color:"#64748b",fontSize:14,fontWeight:"700",cursor:"pointer"}}
-                  onClick={()=>{ setEmpShiftTimeVal(timeEditModal.id,timeEditModal.date,timeEditModal.sh.id,""); setTimeEditModal(null); showToast("שעות אופסו ✓"); }}>
-                  אפס
-                </button>
-                <button style={{flex:2,padding:12,border:"none",borderRadius:10,background:"#1D9E75",color:"#fff",fontSize:14,fontWeight:"700",cursor:"pointer"}}
-                  onClick={()=>{
-                    const s=document.getElementById("te-start")?.value.trim();
-                    const e2=document.getElementById("te-end")?.value.trim();
-                    if(s&&e2){ setEmpShiftTimeVal(timeEditModal.id,timeEditModal.date,timeEditModal.sh.id,`${s}-${e2}`); }
-                    setTimeEditModal(null);
-                    showToast("שעות עודכנו ✓");
-                  }}>
-                  שמור
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
       {toast && <div style={S.toast(toast.type)}>{toast.msg}</div>}
     </div>
   );
