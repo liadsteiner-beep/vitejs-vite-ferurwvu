@@ -357,6 +357,8 @@ export default function App() {
   const [hoveredEmp, setHoveredEmp] = useState(null);
   const dragRef = useRef(null); // {empId, date, shiftId, role}
   const lastEmpClickRef = useRef({id:null, time:0, date:null, sh:null}); // for double-click
+  const longPressRef = useRef(null); // for long press timer
+  const [timeEditModal, setTimeEditModal] = useState(null); // {id, date, sh, currentTime}
   const [scheduleChanged, setScheduleChanged] = useState(false); // alert for employee
   const [showChangeModal, setShowChangeModal] = useState(false);
 
@@ -1170,10 +1172,11 @@ export default function App() {
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
                               const ct=getEmpShiftTime(id,date,sh.id);
-                              return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
-                                <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:11,color:ct?"#6d28d9":"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role,ct)}{label?` ${label}`:""}</span>
-                                {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1,whiteSpace:"nowrap"}}>{n}</span>}
+                              const isHarish=n&&n.includes("חריש בעיר");
+                              return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):isHarish?"#fdf2f4":"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
+                                <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":isHarish?"#6b1a2a":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
+                                <span style={{fontSize:11,color:isHarish?"#6b1a2a":"#334155",fontWeight:isHarish?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role,ct)}{label?` ${label}`:""}</span>
+                                {n&&<span style={{fontSize:11,color:isHarish?"#6b1a2a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${isHarish?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1,whiteSpace:"nowrap"}}>{n}</span>}
                               </div>;
                             })}
                             {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
@@ -1209,10 +1212,11 @@ export default function App() {
                               const isMe=id===currentUser.id;
                               const n=getEmpShiftNote(id,date,sh.id);
                               const ct=getEmpShiftTime(id,date,sh.id);
-                              return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
-                                <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
-                                <span style={{fontSize:11,color:ct?"#6d28d9":"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role,ct)}</span>
-                                {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
+                              const isHarish=n&&n.includes("חריש בעיר");
+                              return <div key={id} style={{padding:"2px 3px",borderRadius:4,background:isMe?(isPast?"#bfdbfe":"#dbeafe"):isHarish?"#fdf2f4":"transparent",marginBottom:2,opacity:isPast?0.7:1}}>
+                                <span style={{fontSize:14,fontWeight:isMe?"800":"700",color:isMe?"#1d4ed8":isHarish?"#6b1a2a":"#1e293b",display:"block"}}>{emp?.name}{isMe?" ⭐":""}</span>
+                                <span style={{fontSize:11,color:isHarish?"#6b1a2a":"#334155",fontWeight:isHarish?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,role,ct)}</span>
+                                {n&&<span style={{fontSize:11,color:isHarish?"#6b1a2a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${isHarish?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
                               </div>;
                             })}
                             {!allEmps.length&&<span style={{color:"#e2e8f0",fontSize:10,display:"block",textAlign:"center"}}>—</span>}
@@ -1844,6 +1848,9 @@ export default function App() {
                           return <div key={id}>
                             {i>0&&allEmps[i-1].sh.id!==sh.id&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
+                              onPointerDown={()=>{ longPressRef.current=setTimeout(()=>{ longPressRef.current=null; setTimeEditModal({id,date,sh,role:emp?.role||"רוקח",currentTime:getEmpShiftTime(id,date,sh.id)||getShiftTime(sh,emp?.role||"רוקח")}); },600); }}
+                              onPointerUp={()=>{ if(longPressRef.current){clearTimeout(longPressRef.current);longPressRef.current=null;} }}
+                              onPointerLeave={()=>{ if(longPressRef.current){clearTimeout(longPressRef.current);longPressRef.current=null;} }}
                               onClick={()=>{
                                 const now=Date.now();
                                 const last=lastEmpClickRef.current;
@@ -1857,9 +1864,9 @@ export default function App() {
                                   lastEmpClickRef.current={id,time:now};
                                 }
                               }}>
-                              <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:"#1e293b",display:"block"}}>{emp?.name}</span>
-                              <span style={{fontSize:11,color:getEmpShiftTime(id,date,sh.id)?"#6d28d9":"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,emp?.role||"רוקח",getEmpShiftTime(id,date,sh.id))}{label?` ${label}`:""}</span>
-                              {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
+                              <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:n&&n.includes("חריש בעיר")?"#6b1a2a":"#1e293b",display:"block"}}>{emp?.name}</span>
+                              <span style={{fontSize:11,color:n&&n.includes("חריש בעיר")?"#6b1a2a":"#334155",fontWeight:n&&n.includes("חריש בעיר")?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,emp?.role||"רוקח",getEmpShiftTime(id,date,sh.id))}{label?` ${label}`:""}</span>
+                              {n&&<span style={{fontSize:11,color:n.includes("חריש בעיר")?"#6b1a2a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${n.includes("חריש בעיר")?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
                         })}
@@ -1893,6 +1900,9 @@ export default function App() {
                           return <div key={id}>
                             {i>0&&<div style={{height:1,background:"#e2e8f0",margin:"2px 0"}}></div>}
                             <div className={`sim-emp${isHov?" hov":hoveredEmp?" dim":""}`}
+                              onPointerDown={()=>{ longPressRef.current=setTimeout(()=>{ longPressRef.current=null; setTimeEditModal({id,date,sh,role:emp?.role||"רוקח",currentTime:getEmpShiftTime(id,date,sh.id)||getShiftTime(sh,emp?.role||"רוקח")}); },600); }}
+                              onPointerUp={()=>{ if(longPressRef.current){clearTimeout(longPressRef.current);longPressRef.current=null;} }}
+                              onPointerLeave={()=>{ if(longPressRef.current){clearTimeout(longPressRef.current);longPressRef.current=null;} }}
                               onClick={()=>{
                                 const now=Date.now();
                                 const last=lastEmpClickRef.current;
@@ -1904,9 +1914,9 @@ export default function App() {
                                   lastEmpClickRef.current={id,time:now};
                                 }
                               }}>
-                              <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:"#1e293b",display:"block"}}>{emp?.name}</span>
-                              <span style={{fontSize:11,color:getEmpShiftTime(id,date,sh.id)?"#6d28d9":"#334155",fontWeight:"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,emp?.role||"רוקח",getEmpShiftTime(id,date,sh.id))}</span>
-                              {n&&<span style={{fontSize:11,color:"#334155",fontStyle:"italic",fontWeight:"500",display:"block",borderTop:"0.5px solid #e2e8f0",marginTop:1,paddingTop:1}}>{n}</span>}
+                              <span className="sim-name" style={{fontSize:14,fontWeight:"700",color:n&&n.includes("חריש בעיר")?"#6b1a2a":"#1e293b",display:"block"}}>{emp?.name}</span>
+                              <span style={{fontSize:11,color:n&&n.includes("חריש בעיר")?"#6b1a2a":"#334155",fontWeight:n&&n.includes("חריש בעיר")?"700":"600",display:"block",whiteSpace:"nowrap"}}>{getShiftTime(sh,emp?.role||"רוקח",getEmpShiftTime(id,date,sh.id))}</span>
+                              {n&&<span style={{fontSize:11,color:n.includes("חריש בעיר")?"#6b1a2a":"#334155",fontStyle:"italic",fontWeight:"600",display:"block",borderTop:`0.5px solid ${n.includes("חריש בעיר")?"#f0b8c0":"#e2e8f0"}`,marginTop:1,paddingTop:1}}>{n}</span>}
                             </div>
                           </div>;
                         })}
@@ -2407,23 +2417,51 @@ export default function App() {
               );
             })}
 
-            {/* Approved vacations */}
-            <div style={{fontWeight:"800",fontSize:14,margin:"16px 0 10px"}}>✅ חופשות מאושרות</div>
-            {employees.map(emp=>{
-              const approved = (vacations[emp.id]||[]).filter(v=>v.status==="approved");
-              if(!approved.length) return null;
-              return (
-                <div key={emp.id} style={S.card}>
-                  <div style={{fontWeight:"700",marginBottom:6}}>{emp.name} <span style={S.badge(emp.role)}>{emp.role}</span></div>
-                  {approved.map(v=>(
-                    <div key={v.id} style={{fontSize:13,color:"#166534",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0",borderBottom:"1px solid #f0fdf4"}}>
-                      <span>{v.type==="יום בודד"?v.start:`${v.start} – ${v.end}`} ({v.type})</span>
+            {/* Approved vacations board - chronological, no past */}
+            <div style={{fontWeight:"800",fontSize:14,margin:"16px 0 10px"}}>✅ לוח חופשות מאושרות</div>
+            {(()=>{
+              const today = new Date(); today.setHours(0,0,0,0);
+              const parseDate = str => {
+                if(!str) return null;
+                const parts = str.split("/").map(Number);
+                if(parts.length===3) return new Date(parts[2]<100?parts[2]+2000:parts[2], parts[1]-1, parts[0]);
+                const p2 = str.split(".").map(Number);
+                if(p2.length===3) return new Date(p2[2]<100?p2[2]+2000:p2[2], p2[1]-1, p2[0]);
+                return null;
+              };
+              // Collect all approved vacations flat
+              const all = [];
+              employees.forEach(emp => {
+                (vacations[emp.id]||[]).filter(v=>v.status==="approved").forEach(v => {
+                  const endDate = parseDate(v.type==="יום בודד" ? v.start : (v.end||v.start));
+                  if(endDate && endDate < today) return; // skip past
+                  const startDate = parseDate(v.start);
+                  all.push({emp, v, startDate, endDate});
+                });
+              });
+              // Sort chronologically
+              all.sort((a,b) => (a.startDate||0) - (b.startDate||0));
+              if(!all.length) return <div style={{fontSize:13,color:"#94a3b8",padding:"12px 0"}}>אין חופשות מאושרות קרובות</div>;
+              return all.map(({emp, v, startDate, endDate}) => {
+                const isNow = startDate && startDate <= today;
+                return (
+                  <div key={`${emp.id}_${v.id}`} style={{...S.card, marginBottom:8, border:`1.5px solid ${isNow?"#86efac":"#e2e8f0"}`, background:isNow?"#f0fdf4":"#fff"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <span style={{fontWeight:"700",fontSize:14}}>{emp.name}</span>
+                        <span style={{...S.badge(emp.role),marginRight:6,marginLeft:6}}>{emp.role}</span>
+                        {isNow && <span style={{fontSize:11,background:"#dcfce7",color:"#15803d",padding:"2px 7px",borderRadius:12,fontWeight:"700"}}>⏳ עכשיו</span>}
+                        {!isNow && <span style={{fontSize:11,background:"#e0f2fe",color:"#0369a1",padding:"2px 7px",borderRadius:12,fontWeight:"700"}}>🔜 בקרוב</span>}
+                      </div>
                       <button style={S.btnSm("#ef4444")} onClick={()=>setVacations(prev=>({...prev,[emp.id]:(prev[emp.id]||[]).filter(x=>x.id!==v.id)}))}>✕</button>
                     </div>
-                  ))}
-                </div>
-              );
-            })}
+                    <div style={{fontSize:13,color:"#475569",marginTop:6}}>
+                      📅 {v.type==="יום בודד"?v.start:`${v.start} – ${v.end}`} <span style={{color:"#94a3b8"}}>({v.type})</span>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         )}
 
@@ -2535,6 +2573,33 @@ export default function App() {
       </div>
 
       {changePwModal && <ChangePwModal />}
+      {timeEditModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setTimeEditModal(null);}}>
+          <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:480,direction:"rtl"}}>
+            <div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2,margin:"0 auto 16px"}}></div>
+            <div style={{fontSize:17,fontWeight:"700",color:"#1e293b",marginBottom:4}}>✏️ שינוי שעות משמרת</div>
+            <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>
+              {employees.find(e=>e.id===timeEditModal.id)?.name} • {timeEditModal.sh.label} • {timeEditModal.date.toLocaleDateString("he-IL",{weekday:"short",day:"numeric",month:"numeric"})}
+            </div>
+            <input
+              style={{width:"100%",fontSize:16,padding:"11px 14px",border:"1.5px solid #a78bfa",borderRadius:10,color:"#6d28d9",background:"#ede9fe",fontWeight:"600",boxSizing:"border-box",direction:"ltr",textAlign:"center",marginBottom:12}}
+              placeholder={getShiftTime(timeEditModal.sh, timeEditModal.role)}
+              defaultValue={timeEditModal.currentTime}
+              id="time-edit-input"
+            />
+            <div style={{display:"flex",gap:8}}>
+              <button style={{flex:1,padding:12,border:"1.5px solid #e2e8f0",borderRadius:10,background:"#f8fafc",color:"#64748b",fontSize:14,fontWeight:"700",cursor:"pointer"}}
+                onClick={()=>{ setEmpShiftTimeVal(timeEditModal.id,timeEditModal.date,timeEditModal.sh.id,""); setTimeEditModal(null); showToast("שעות אופסו ✓"); }}>
+                אפס לברירת מחדל
+              </button>
+              <button style={{flex:1,padding:12,border:"none",borderRadius:10,background:"#6d28d9",color:"#fff",fontSize:14,fontWeight:"700",cursor:"pointer"}}
+                onClick={()=>{ const val=document.getElementById("time-edit-input").value.trim(); if(val){setEmpShiftTimeVal(timeEditModal.id,timeEditModal.date,timeEditModal.sh.id,val);} setTimeEditModal(null); showToast("שעות עודכנו ✓"); }}>
+                שמור
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {toast && <div style={S.toast(toast.type)}>{toast.msg}</div>}
     </div>
   );
