@@ -1206,10 +1206,40 @@ export default function App() {
           <div style={{display:"flex",background:"#f1f5f9",borderRadius:"10px",padding:3,gap:3,marginBottom:12}}>
             {published && <button style={{...S.tab(empTab==="schedule"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("schedule")}>📋 סידור</button>}
             <button style={{...S.tab(empTab==="avail"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("avail")}>✏️ זמינות</button>
-            <button style={{...S.tab(empTab==="vac"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("vac")}>🌴 חופשה</button>
+            <button style={{...S.tab(empTab==="vac"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("vac")}>🌴 חופשים</button>
             {myRole==="רוקח" && (dutyAvailOpen||dutyPublished) && <button style={{...S.tab(empTab==="duty"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("duty")}>⭐ תורנות</button>}
             <button style={{...S.tab(empTab==="note"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("note")}>📝 הערה</button>
           </div>
+
+          {(() => {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const upcoming = employees.flatMap(emp =>
+              (vacations[emp.id]||[]).filter(v => {
+                if (v.status !== "approved") return false;
+                const parseD = str => {
+                  if (!str) return null;
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) { const [y,m,d]=str.split("-").map(Number); return new Date(y,m-1,d); }
+                  const sep = str.includes("/") ? "/" : str.includes(".") ? "." : null;
+                  if (!sep) return null;
+                  const [d,m,y] = str.split(sep).map(s=>parseInt(s,10));
+                  return new Date(y<100?y+2000:y,m-1,d);
+                };
+                const endD = parseD(v.end || v.start);
+                return endD && endD >= today;
+              })
+            );
+            if (!upcoming.length || empTab !== "schedule") return null;
+            return (
+              <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10,cursor:"pointer"}}
+                onClick={()=>setEmpTab("vac")}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:"700",color:"#15803d"}}>🌴 חופשים קרובים בצוות</div>
+                  <div style={{fontSize:12,color:"#16a34a",marginTop:2}}>{upcoming.length} חופשה{upcoming.length>1?"ות":""} מאושר{upcoming.length>1?"ות":""} — לחצי לצפייה</div>
+                </div>
+                <span style={{fontSize:18}}>›</span>
+              </div>
+            );
+          })()}
 
           {empTab==="schedule" && published && (
             <div style={{marginTop:4}}>
