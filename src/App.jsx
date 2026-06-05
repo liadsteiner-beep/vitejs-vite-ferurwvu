@@ -354,10 +354,19 @@ export default function App() {
   const [changePwNew2, setChangePwNew2]   = useState("");
   const [changePwErr, setChangePwErr]     = useState("");
   const [hoveredEmp, setHoveredEmp] = useState(null);
-  const dragRef = useRef(null); // {empId, date, shiftId, role}
-  const lastEmpClickRef = useRef({id:null, time:0, date:null, sh:null}); // for double-click
-  const [scheduleChanged, setScheduleChanged] = useState(false); // alert for employee
+  const dragRef = useRef(null);
+  const lastEmpClickRef = useRef({id:null, time:0, date:null, sh:null});
+  const [scheduleChanged, setScheduleChanged] = useState(false);
   const [showChangeModal, setShowChangeModal] = useState(false);
+
+  // ── Friday Duty System ──
+  const [dutyPeriod, setDutyPeriod] = useState(null);     // {start:"DD/MM/YYYY", end:"DD/MM/YYYY", quotas:{empId:n}}
+  const [dutyAvail, setDutyAvail] = useState({});          // {empId: {dateStr: true/false}}
+  const [dutyAssign, setDutyAssign] = useState([]);        // [{date, emp1, emp2}] — approved
+  const [dutyPublished, setDutyPublished] = useState(false);
+  const [dutyAvailOpen, setDutyAvailOpen] = useState(false); // employee sees availability form
+  const [dutySetupStep, setDutySetupStep] = useState(1);   // 1=setup 2=awaiting 3=assign 4=publish
+  const [dutyDraft, setDutyDraft] = useState([]);          // auto-assign draft before approval
 
   // Enable pinch-to-zoom on the whole page
   useEffect(() => {
@@ -431,6 +440,12 @@ export default function App() {
       if (d.shiftNotes)   setShiftNotes(d.shiftNotes);
       if (d.vacations)    setVacations(d.vacations);
       if (d.empShiftNotes) setEmpShiftNotes(d.empShiftNotes);
+      if (d.dutyPeriod)   setDutyPeriod(d.dutyPeriod);
+      if (d.dutyAvail)    setDutyAvail(d.dutyAvail);
+      if (d.dutyAssign)   setDutyAssign(d.dutyAssign);
+      if (d.dutyPublished) setDutyPublished(d.dutyPublished);
+      if (d.dutyAvailOpen !== undefined) setDutyAvailOpen(d.dutyAvailOpen);
+      if (d.dutySetupStep) setDutySetupStep(d.dutySetupStep);
       setFbLoaded(true);
       // Detect schedule changes since last visit (for employee alert)
       if (d.assigned) {
@@ -468,8 +483,8 @@ export default function App() {
 
   useEffect(() => {
     if (!fbLoaded) return; // Don't save before Firebase data is loaded
-    saveData({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes });
-  }, [employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes]);
+    saveData({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes, dutyPeriod, dutyAvail, dutyAssign, dutyPublished, dutyAvailOpen, dutySetupStep });
+  }, [employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, dayRemarks, shiftNotes, vacations, empShiftNotes, dutyPeriod, dutyAvail, dutyAssign, dutyPublished, dutyAvailOpen, dutySetupStep]);
 
   function showToast(msg, type="ok") { setToast({msg,type}); setTimeout(()=>setToast(null),3000); }
 
@@ -574,6 +589,52 @@ export default function App() {
   const esnKey = (empId, date, shiftId) => `${empId}_${dateKey(date)}_${shiftId}`;
   function getEmpShiftNote(empId, date, shiftId) { return empShiftNotes[esnKey(empId,date,shiftId)] || ""; }
   function setEmpShiftNote(empId, date, shiftId, val) { setEmpShiftNotes(prev=>({...prev,[esnKey(empId,date,shiftId)]:val})); }
+
+  // ── Friday Duty Helpers ──
+  function parseDMY(str) {
+    if(!str) return null;
+    const sep = str.includes("/") ? "/" : str.includes(".") ? "." : null;
+    if(!sep) return null;
+    const [d,m,y] = str.split(sep).map(s=>parseInt(s,10));
+    return new Date(y<100?y+2000:y, m-1, d);
+  }
+  function getFridaysInRange(start, end) {
+    const fridays = [];
+    const d = new Date(start); d.setHours(0,0,0,0);
+    while(d <= end) {
+      if(d.getDay()===5) fridays.push(new Date(d));
+      d.setDate(d.getDate()+1);
+    }
+    return fridays;
+  }
+  function dutyDateKey(date) { return `${date.getDate()}/${date.getMonth()+1}/${date.getFullYear()}`; }
+  function autoAssignDuty(fridays, quotas, avail) {
+    const draft = [];
+    const counts = {};
+    Object.keys(quotas).forEach(id => counts[id]=0);
+    const pharmacists = employees.filter(e=>e.role==="רוקח");
+    let lastTwo = []; // last two assigned emp ids
+    for(const fri of fridays) {
+      const dk = dutyDateKey(fri);
+      const eligible = pharmacists.filter(e=>{
+        const q = quotas[e.id]||0;
+        if(counts[e.id]>=q) return false;
+        const avl = (avail[e.id]||{})[dk];
+        return avl !== false; // default true if not set
+      });
+      // prefer not consecutive
+      const pref = eligible.filter(e=>!lastTwo.includes(e.id));
+      const pool = pref.length>=2 ? pref : eligible;
+      // pick 2
+      const picked = pool.slice(0,2);
+      if(picked.length<2 && eligible.length>=2) picked.push(...eligible.filter(e=>!picked.includes(e)).slice(0,2-picked.length));
+      const warn = picked.some(e=>lastTwo.includes(e.id));
+      draft.push({date:dk, emp1:picked[0]?.name||"?", emp2:picked[1]?.name||"?", warn});
+      picked.forEach(e=>{ if(e) counts[e.id]=(counts[e.id]||0)+1; });
+      lastTwo = picked.map(e=>e?.id).filter(Boolean);
+    }
+    return draft;
+  }
 
   function openChangePw() {
     setChangePwModal(currentUser.isManager ? "manager" : currentUser.id);
@@ -1058,6 +1119,7 @@ export default function App() {
             {published && <button style={{...S.tab(empTab==="schedule"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("schedule")}>📋 סידור</button>}
             <button style={{...S.tab(empTab==="avail"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("avail")}>✏️ זמינות</button>
             <button style={{...S.tab(empTab==="vac"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("vac")}>🌴 חופשה</button>
+            {myRole==="רוקח" && (dutyAvailOpen||dutyPublished) && <button style={{...S.tab(empTab==="duty"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("duty")}>⭐ תורנות</button>}
             <button style={{...S.tab(empTab==="note"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("note")}>📝 הערה</button>
           </div>
 
@@ -1441,6 +1503,46 @@ export default function App() {
           {/* Vacation tab */}
           {empTab==="vac" && (
           <div>
+
+          {/* Vacation board - all approved */}
+          {(()=>{
+            const today = new Date(); today.setHours(0,0,0,0);
+            const parseDate = str => {
+              if(!str) return null;
+              const sep = str.includes("/") ? "/" : str.includes(".") ? "." : null;
+              if(!sep) return null;
+              const [d,m,y] = str.split(sep).map(s=>parseInt(s,10));
+              return new Date(y<100?y+2000:y, m-1, d);
+            };
+            const all = [];
+            employees.forEach(emp => {
+              (vacations[emp.id]||[]).filter(v=>v.status==="approved").forEach(v => {
+                const endDate = parseDate(v.type==="יום בודד" ? v.start : (v.end||v.start));
+                if(endDate && endDate < today) return;
+                const startDate = parseDate(v.start);
+                all.push({emp, v, startDate});
+              });
+            });
+            all.sort((a,b)=>(a.startDate||0)-(b.startDate||0));
+            if(!all.length) return null;
+            return <div style={S.card}>
+              <div style={S.sTitle}>📅 לוח חופשות — כל הצוות</div>
+              <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                {all.map(({emp,v,startDate})=>{
+                  const isNow = startDate && startDate <= today;
+                  const isMe = emp.id===currentUser.id;
+                  return <div key={`${emp.id}_${v.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,background:isMe?"#eff6ff":isNow?"#f0fdf4":"#f8fafc",border:`1px solid ${isMe?"#93c5fd":isNow?"#86efac":"#e2e8f0"}`}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:"700",color:isMe?"#1d4ed8":"#1e293b"}}>{emp.name}{isMe?" (אני)":""}</div>
+                      <div style={{fontSize:12,color:"#64748b",marginTop:2}}>{v.type==="יום בודד"?v.start:`${v.start} – ${v.end}`}</div>
+                    </div>
+                    <span style={{fontSize:11,padding:"2px 8px",borderRadius:12,fontWeight:"700",background:isNow?"#dcfce7":"#e0f2fe",color:isNow?"#15803d":"#0369a1"}}>{isNow?"⏳ עכשיו":"🔜 בקרוב"}</span>
+                  </div>;
+                })}
+              </div>
+            </div>;
+          })()}
+
           {/* Vacation request */}
           <div style={S.card}>
             <div style={S.sTitle}>🌴 בקשת חופשה</div>
@@ -1507,6 +1609,57 @@ export default function App() {
           </div>
 
           </div>)} {/* end vac tab */}
+
+          {/* Duty tab - Friday availability and published schedule */}
+          {empTab==="duty" && myRole==="רוקח" && (()=>{
+            const fridays = dutyPeriod ? getFridaysInRange(parseDMY(dutyPeriod.start), parseDMY(dutyPeriod.end)) : [];
+            const myDuties = dutyPublished ? dutyAssign.filter(r=>r.emp1===currentUser.name||r.emp2===currentUser.name) : [];
+            return <div>
+              {/* Availability form - open only when not published */}
+              {dutyAvailOpen && !dutyPublished && <div style={S.card}>
+                <div style={S.sTitle}>⭐ סמן/י זמינות לתורנות שישי</div>
+                <div style={{fontSize:12,color:"#1D9E75",background:"#f0fdf4",border:"1px solid #86efac",borderRadius:7,padding:"7px 10px",marginBottom:12}}>
+                  ✓ כברירת מחדל את/ה זמין/ה לכל ימי השישי — הורד/י סימון מתאריך שאינך פנוי/ה
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {fridays.map(f=>{
+                    const dk=dutyDateKey(f);
+                    const val=(dutyAvail[currentUser.id]||{})[dk];
+                    const isAvail = val!==false;
+                    return <div key={dk} style={{display:"flex",alignItems:"center",gap:12,padding:"9px 12px",borderRadius:9,border:"1px solid #e2e8f0",background:"#f8fafc"}}>
+                      <div style={{fontSize:14,fontWeight:"700",color:"#1e293b",flex:1}}>שישי {dk}</div>
+                      <button onClick={()=>setDutyAvail(prev=>({...prev,[currentUser.id]:{...(prev[currentUser.id]||{}),[dk]:!isAvail}}))}
+                        style={{width:42,height:42,borderRadius:9,border:`2px solid ${isAvail?"#22c55e":"#e2e8f0"}`,background:isAvail?"#dcfce7":"#f1f5f9",fontSize:20,cursor:"pointer",color:isAvail?"#15803d":"#cbd5e1"}}>
+                        ✓
+                      </button>
+                    </div>;
+                  })}
+                </div>
+                <button style={{...S.btn("#1D9E75"),width:"100%",marginTop:12}} onClick={()=>showToast("זמינות נשמרה ✓")}>שמור זמינות</button>
+              </div>}
+
+              {/* Published duties list */}
+              {dutyPublished && <div style={S.card}>
+                <div style={S.sTitle}>⭐ תורנויות שישי — פורסם</div>
+                <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                  {dutyAssign.map((row,i)=>{
+                    const isMe=row.emp1===currentUser.name||row.emp2===currentUser.name;
+                    return <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,background:isMe?"#ede9fe":"#f8fafc",border:`${isMe?"1.5px solid #a78bfa":"1px solid #e2e8f0"}`}}>
+                      <div style={{fontSize:14,fontWeight:"700",color:isMe?"#6d28d9":"#475569",minWidth:60}}>{row.date}</div>
+                      <div style={{flex:1,fontSize:14}}>
+                        {isMe?<><span style={{fontWeight:"800",color:"#6d28d9"}}>{currentUser.name} ⭐</span><span style={{color:"#475569"}}> • {row.emp1===currentUser.name?row.emp2:row.emp1}</span></>
+                          :<span style={{color:"#475569"}}>{row.emp1} • {row.emp2}</span>}
+                      </div>
+                      {isMe && <span style={{fontSize:11,padding:"2px 8px",borderRadius:12,background:"#c4b5fd",color:"#4c1d95",fontWeight:"700"}}>אני בתורנות</span>}
+                    </div>;
+                  })}
+                </div>
+                <div style={{fontSize:11,color:"#7c3aed",textAlign:"center",padding:"6px",background:"#ede9fe",borderRadius:8,marginTop:10}}>🔒 נעול — לשינויים פנה/י למנהלת</div>
+              </div>}
+
+              {!dutyAvailOpen && !dutyPublished && <div style={{fontSize:13,color:"#94a3b8",textAlign:"center",padding:"30px 0"}}>תורנות שישי טרם נפתחה לסימון זמינות</div>}
+            </div>;
+          })()}
 
           {/* Note tab */}
           {empTab==="note" && (
@@ -1681,7 +1834,7 @@ export default function App() {
 
   // ════════════ MANAGER ════════════
   const missing = getMissingSlots();
-  const tabs = [["simulation","📊 סימולציה"],["assign","✏️ שיבוץ"],["publish","📤 פרסום"],["notes","📝 הערות"],["feedback","💡 משוב"],["vacations","🌴 חופשות"],["settings","⚙️ הגדרות"]];
+  const tabs = [["simulation","📊 סימולציה"],["assign","✏️ שיבוץ"],["publish","📤 פרסום"],["notes","📝 הערות"],["feedback","💡 משוב"],["vacations","🌴 חופשות"],["duty","⭐ תורנות שישי"],["settings","⚙️ הגדרות"]];
 
   return (
     <div style={S.app}>
@@ -2477,6 +2630,140 @@ export default function App() {
             })()}
           </div>
         )}
+
+        {/* ── FRIDAY DUTY TAB ── */}
+        {managerTab==="duty" && (()=>{
+          const fridays = dutyPeriod ? getFridaysInRange(parseDMY(dutyPeriod.start), parseDMY(dutyPeriod.end)) : [];
+          const pharmacists = employees.filter(e=>e.role==="רוקח");
+
+          return <div>
+            {/* Step tabs */}
+            <div style={{display:"flex",gap:4,marginBottom:14,overflowX:"auto"}}>
+              {[["1","הגדרה"],["2","זמינויות"],["3","שיבוץ"],["4","פרסום"]].map(([n,label])=>(
+                <button key={n} style={{...S.tab(dutySetupStep===parseInt(n)),flexShrink:0,padding:"8px 14px"}} onClick={()=>setDutySetupStep(parseInt(n))}>{n}. {label}</button>
+              ))}
+            </div>
+
+            {/* Step 1: Setup */}
+            {dutySetupStep===1 && <div>
+              <div style={S.card}>
+                <div style={S.sTitle}>📅 טווח תאריכים לתורנות שישי</div>
+                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                  <input style={{...S.input,flex:1}} placeholder="התחלה DD/MM/YYYY" value={dutyPeriod?.start||""} onChange={e=>setDutyPeriod(p=>({...p||{},start:e.target.value}))}/>
+                  <input style={{...S.input,flex:1}} placeholder="סיום DD/MM/YYYY" value={dutyPeriod?.end||""} onChange={e=>setDutyPeriod(p=>({...p||{},start:p?.start||"",end:e.target.value,quotas:p?.quotas||{}}))}/>
+                </div>
+                {fridays.length>0 && <div style={{fontSize:13,color:"#1D9E75",fontWeight:"600",marginBottom:14}}>✓ {fridays.length} ימי שישי • {fridays.length*2} משמרות סה"כ</div>}
+              </div>
+              {fridays.length>0 && <div style={S.card}>
+                <div style={S.sTitle}>מכסה לכל רוקח (סה"כ נדרש: {fridays.length*2})</div>
+                {pharmacists.map(emp=>(
+                  <div key={emp.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 0",borderBottom:"0.5px solid #f1f5f9"}}>
+                    <span style={{fontSize:14,fontWeight:"600"}}>{emp.name}</span>
+                    <input type="number" min="0" max={fridays.length*2}
+                      style={{width:60,fontSize:14,padding:"4px 8px",border:"1.5px solid #e2e8f0",borderRadius:8,textAlign:"center",fontWeight:"700"}}
+                      value={(dutyPeriod?.quotas||{})[emp.id]||0}
+                      onChange={e=>setDutyPeriod(p=>({...p,quotas:{...(p?.quotas||{}),[emp.id]:parseInt(e.target.value)||0}}))}
+                    />
+                  </div>
+                ))}
+                <div style={{fontSize:12,color:"#64748b",marginTop:8}}>
+                  מוקצה: {Object.values(dutyPeriod?.quotas||{}).reduce((a,b)=>a+b,0)} / {fridays.length*2}
+                </div>
+                <button style={{...S.btn("#1D9E75"),width:"100%",marginTop:12}}
+                  onClick={()=>{ setDutyAvailOpen(true); setDutySetupStep(2); fbSave({employees,availability,assigned,notes,empNotes,empPasswords,managerPassword,fridayRota,published,dayRemarks,shiftNotes,vacations,empShiftNotes,dutyPeriod,dutyAvail,dutyAssign,dutyPublished,dutyAvailOpen:true,dutySetupStep:2}); showToast("נשלח לרוקחים ✓"); }}>
+                  ➤ שלח לרוקחים לסמן זמינות
+                </button>
+              </div>}
+            </div>}
+
+            {/* Step 2: View availabilities */}
+            {dutySetupStep===2 && <div>
+              <div style={S.card}>
+                <div style={S.sTitle}>זמינויות שהתקבלו</div>
+                {fridays.length===0 && <div style={{color:"#94a3b8",fontSize:13}}>הגדר תקופה קודם</div>}
+                <div style={{overflowX:"auto"}}>
+                  <table style={{borderCollapse:"collapse",fontSize:13,minWidth:400}}>
+                    <thead>
+                      <tr style={{background:"#1D9E75",color:"#fff"}}>
+                        <th style={{padding:"8px 10px",border:"0.5px solid #0F6E56",textAlign:"right"}}>רוקח</th>
+                        {fridays.map(f=><th key={dutyDateKey(f)} style={{padding:"8px 6px",border:"0.5px solid #0F6E56",textAlign:"center",fontSize:11}}>{dutyDateKey(f)}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pharmacists.map(emp=>(
+                        <tr key={emp.id}>
+                          <td style={{padding:"7px 10px",fontWeight:"700",border:"0.5px solid #e2e8f0"}}>{emp.name}</td>
+                          {fridays.map(f=>{
+                            const dk=dutyDateKey(f);
+                            const val=(dutyAvail[emp.id]||{})[dk];
+                            return <td key={dk} style={{border:"0.5px solid #e2e8f0",textAlign:"center",background:val===false?"#fee2e2":val===true?"#dcfce7":"#f8fafc",fontSize:13,fontWeight:"600",color:val===false?"#dc2626":val===true?"#15803d":"#94a3b8"}}>
+                              {val===false?"✗":val===true?"✓":"—"}
+                            </td>;
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <button style={{...S.btn("#7c3aed"),width:"100%",marginTop:12}}
+                  onClick={()=>{ const draft=autoAssignDuty(fridays,dutyPeriod?.quotas||{},dutyAvail); setDutyDraft(draft); setDutySetupStep(3); }}>
+                  ⚡ צור שיבוץ אוטומטי
+                </button>
+              </div>
+            </div>}
+
+            {/* Step 3: Review & approve */}
+            {dutySetupStep===3 && <div>
+              <div style={S.card}>
+                <div style={S.sTitle}>שיבוץ לאישורך</div>
+                <div style={{fontSize:12,color:"#64748b",marginBottom:12}}>לחצי על שם לבחירה • פתיחה/סגירה תיקבע בסידור השבועי</div>
+                {(dutyDraft.length?dutyDraft:dutyAssign).map((row,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,border:`1px solid ${row.warn?"#fdba74":"#e2e8f0"}`,background:row.warn?"#fff7ed":"#fff",marginBottom:6}}>
+                    <div style={{fontSize:14,fontWeight:"700",color:row.warn?"#92400e":"#475569",minWidth:60}}>{row.date}</div>
+                    <span style={{fontSize:14,fontWeight:"700",color:"#1e293b",cursor:"pointer",padding:"2px 6px",borderRadius:5}} onClick={()=>{}}>{row.emp1||"—"}</span>
+                    <span style={{color:"#cbd5e1",fontSize:12}}>•</span>
+                    <span style={{fontSize:14,fontWeight:"700",color:"#1e293b",cursor:"pointer",padding:"2px 6px",borderRadius:5}} onClick={()=>{}}>{row.emp2||"—"}</span>
+                    {row.warn && <span style={{marginRight:"auto",fontSize:13}}>⚠️</span>}
+                  </div>
+                ))}
+                {(dutyDraft.length?dutyDraft:dutyAssign).some(r=>r.warn) && (
+                  <div style={{fontSize:12,color:"#b45309",background:"#fff7ed",borderRadius:8,padding:"8px 10px",marginBottom:10}}>⚠️ שבועיים ברצף — לא ניתן למנוע בשל מגבלות זמינות</div>
+                )}
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <button style={{...S.btnOut("#64748b"),flex:1}} onClick={()=>setDutySetupStep(2)}>← חזרה</button>
+                  <button style={{...S.btn("#1D9E75"),flex:2}}
+                    onClick={()=>{ setDutyAssign(dutyDraft.length?dutyDraft:dutyAssign); setDutyDraft([]); setDutySetupStep(4); }}>
+                    ✓ אשרי שיבוץ
+                  </button>
+                </div>
+              </div>
+            </div>}
+
+            {/* Step 4: Publish */}
+            {dutySetupStep===4 && <div>
+              <div style={S.card}>
+                <div style={S.sTitle}>פרסום תורנות שישי</div>
+                {dutyPublished && <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"10px 12px",marginBottom:12,fontSize:14,fontWeight:"600",color:"#15803d"}}>✓ פורסם</div>}
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+                  {dutyAssign.map((row,i)=>(
+                    <div key={i} style={{display:"flex",gap:10,padding:"8px 12px",borderRadius:8,background:"#f8fafc",border:"0.5px solid #e2e8f0"}}>
+                      <span style={{fontWeight:"700",minWidth:60,fontSize:13}}>{row.date}</span>
+                      <span style={{fontSize:13,color:"#1e293b"}}>{row.emp1} • {row.emp2}</span>
+                    </div>
+                  ))}
+                </div>
+                <button style={{...S.btn(dutyPublished?"#22c55e":"#1D9E75"),width:"100%"}}
+                  onClick={()=>{
+                    setDutyPublished(true);
+                    fbSave({employees,availability,assigned,notes,empNotes,empPasswords,managerPassword,fridayRota,published,dayRemarks,shiftNotes,vacations,empShiftNotes,dutyPeriod,dutyAvail,dutyAssign,dutyPublished:true,dutyAvailOpen:false,dutySetupStep:4});
+                    showToast("תורנות שישי פורסמה ✓");
+                  }}>
+                  {dutyPublished?"✓ פורסם":"📲 פרסם תורנות שישי לרוקחים"}
+                </button>
+              </div>
+            </div>}
+          </div>;
+        })()}
 
         {/* ── SETTINGS TAB ── */}
         {managerTab==="settings" && (
