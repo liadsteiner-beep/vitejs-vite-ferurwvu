@@ -456,6 +456,7 @@ export default function App() {
       }
       if (d.dutyPeriod)   setDutyPeriod(d.dutyPeriod);
       if (d.dutyAvail)    setDutyAvail(d.dutyAvail);
+      // תמיד כתוב את הרשימה הנכונה (לאחר עריכה ידנית)
       const initialDuty = [
           { date:"5/6/2026",  emp1:"ליאן",  emp2:"סג׳א" },
           { date:"12/6/2026", emp1:"ליאן",  emp2:"סלאם" },
@@ -467,18 +468,13 @@ export default function App() {
           { date:"24/7/2026", emp1:"ליעד",  emp2:"ליאן" },
           { date:"31/7/2026", emp1:"סמר",   emp2:"סג׳א" },
       ];
-      // בדוק אם הנתונים הקיימים תקינים (ימי שישי בלבד)
-      const dutyIsValid = d.dutyAssign && d.dutyAssign.length > 0 && d.dutyAssign.every(r => {
-        const parts = r.date.split("/").map(Number);
-        if (parts.length !== 3) return false;
-        const dt = new Date(parts[2], parts[1]-1, parts[0]);
-        return dt.getDay() === 5; // שישי בלבד
-      });
-      if (dutyIsValid) {
+      const DUTY_VERSION = "v3";
+      const savedVersion = d.dutyVersion;
+      if (d.dutyAssign && d.dutyAssign.length > 0 && savedVersion === DUTY_VERSION) {
         setDutyAssign(d.dutyAssign);
       } else {
         setDutyAssign(initialDuty);
-        fbSave({ ...d, dutyAssign: initialDuty, dutyPublished: true, dutyAvailOpen: false });
+        fbSave({ ...d, dutyAssign: initialDuty, dutyPublished: true, dutyAvailOpen: false, dutyVersion: DUTY_VERSION });
       }
       if (d.dutyPublished !== undefined) {
         setDutyPublished(d.dutyPublished);
