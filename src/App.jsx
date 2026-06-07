@@ -2345,8 +2345,9 @@ export default function App() {
                           const filled=assignedIds.length;
                           const needed=shift.slots[role]||1;
                           const isMissing=filled<needed;
+                          const hovEmpAvail = hoveredEmp && isAv(hoveredEmp, date, shift.id);
                           return (
-                            <td key={dateKey(date)} style={{padding:"4px",textAlign:"center",background:isMissing?"#fef2f2":"inherit",verticalAlign:"top",minWidth:80}}>
+                            <td key={dateKey(date)} style={{padding:"4px",textAlign:"center",background:isMissing?"#fef2f2":hovEmpAvail?"#f0fdf4":"#fff",verticalAlign:"top",minWidth:80}}>
                               {getShiftNote(date,shift.id)&&<div style={{fontSize:9,color:"#92400e",background:"#fef3c7",borderRadius:3,padding:"1px 3px",marginBottom:2}}>💬</div>}
                               {isMissing&&<div style={{fontSize:9,color:"#ef4444",fontWeight:"700",marginBottom:2}}>⚠️ חסר</div>}
                               <div style={{display:"flex",flexDirection:"column",gap:2,marginBottom:2}}>
@@ -2357,7 +2358,7 @@ export default function App() {
                                   let pressTimer = null;
                                   let pressFired = false;
                                   return (
-                                    <div key={id} data-empid={id}
+                                    <div key={id} data-empid={id} style={{position:"relative"}}
                                       onMouseEnter={()=>{
                                         document.querySelectorAll(`[data-empid="${id}"]`).forEach(el=>el.classList.add("emp-hov"));
                                         document.getElementById("assign-table")?.classList.add("emp-hovering");
@@ -2367,6 +2368,8 @@ export default function App() {
                                         document.getElementById("assign-table")?.classList.remove("emp-hovering");
                                         if(pressTimer) clearTimeout(pressTimer);
                                       }}>
+                                      {/* נקודה כתומה אם שובץ ידנית מחוץ לזמינות */}
+                                      {!isAv(id,date,shift.id) && <div style={{position:"absolute",top:-3,right:-3,width:8,height:8,background:"#f59e0b",borderRadius:"50%",border:"1.5px solid #fff",zIndex:2}} title="שובץ ידנית — לא ציין זמינות"></div>}
                                       <button
                                         draggable
                                         onDragStart={()=>{ dragRef.current={empId:id,date,shiftId:shift.id,role}; }}
@@ -2396,7 +2399,7 @@ export default function App() {
                                           clearTimeout(pressTimer);
                                           if(!pressFired) { e.preventDefault(); toggleAssign(date,shift.id,role,id); }
                                         }}
-                                        style={{borderRadius:"6px",padding:"3px 5px",fontSize:11,fontWeight:"700",color:"#14532d",cursor:"grab",width:"100%",transition:"all 0.15s",background:"#dcfce7",border:"2px solid #22c55e",userSelect:"none"}}>
+                                        style={{borderRadius:"6px",padding:"3px 5px",fontSize:11,fontWeight:"700",color:"#14532d",cursor:"grab",width:"100%",transition:"all 0.15s",background:"#dcfce7",border:`2px solid ${isAv(id,date,shift.id)?"#22c55e":"#f59e0b"}`,userSelect:"none"}}>
                                         ✓ {emp?.name}
                                         {customTime && <span style={{display:"block",fontSize:9,color:"#0369a1",fontWeight:"600"}}>{customTime}</span>}
                                       </button>
