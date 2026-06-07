@@ -344,7 +344,8 @@ export default function App() {
   const weekDates = getWeekDates(weekOffset);
   const currentRealWeekDates = getWeekDates(0);
   const nextWeekDates = getWeekDates(1);
-  const nextWeekPublished = published;
+  const nextWeekStart = dateKey(nextWeekDates[0]);
+  const nextWeekPublished = published && publishedWeekStart === nextWeekStart;
   const [dayRemarks, setDayRemarks] = useState({});
   const [shiftNotes, setShiftNotes] = useState({});
   const [empShiftNotes, setEmpShiftNotes] = useState({});
