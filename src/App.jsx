@@ -715,12 +715,12 @@ export default function App() {
     };
 
     const recovered = { [weekStart]: restoredAssigned };
-    setAssigned(prev => ({...restoredAssigned, ...prev}));
-    setPublishedByWeek(recovered);
+    setAssigned({...restoredAssigned});
+    setPublishedByWeek({...recovered});
     setPublishedWeekStart(weekStart);
     setPublished(true);
-    setPublishedAssigned(restoredAssigned);
-    setEmpShiftNotes(prev => ({...restoredEmpShiftNotes, ...prev}));
+    setPublishedAssigned({...restoredAssigned});
+    setEmpShiftNotes(prev => ({...prev, ...restoredEmpShiftNotes}));
 
     setDoc(doc(db, "pharmacy", "schedule"), {
       assigned: restoredAssigned,
