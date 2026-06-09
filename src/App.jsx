@@ -643,30 +643,94 @@ export default function App() {
 
   function showToast(msg, type="ok") { setToast({msg,type}); setTimeout(()=>setToast(null),3000); }
 
-  // שחזור חירום: אם publishedByWeek ריק — כתוב ישירות מ-Firebase
+  // ── שחזור סידור 7.6–13.6 ──
   useEffect(() => {
     if (!fbLoaded) return;
-    if (Object.keys(publishedByWeek).length > 0) return; // כבר יש נתונים
-    // טען ישירות מ-Firebase
-    getDoc(doc(db, "pharmacy", "schedule")).then(snap => {
-      if (!snap.exists()) return;
-      const d = snap.data();
-      if (!d.assigned || Object.keys(d.assigned).length === 0) return;
-      const weekStart = "2026-06-07"; // שבוע 7.6
-      const recovered = { [weekStart]: d.assigned };
-      setPublishedByWeek(recovered);
-      setPublishedWeekStart(weekStart);
-      setPublished(true);
-      setPublishedAssigned(d.assigned);
-      setAssigned(d.assigned);
-      setDoc(doc(db, "pharmacy", "schedule"), {
-        publishedByWeek: recovered,
-        publishedWeekStart: weekStart,
-        published: true,
-        publishedAssigned: d.assigned
-      }, { merge: true }).then(() => {
-        showToast("סידור שוחזר ✓");
-      }).catch(console.error);
+    if (Object.keys(publishedByWeek).length > 0) return;
+
+    const weekStart = "2026-06-07";
+
+    // הוסף יוליה ומוסטפה אם לא קיימים
+    setEmployees(prev => {
+      const hasYulia = prev.some(e => e.name === "יוליה");
+      const hasMustafa = prev.some(e => e.name === "מוסטפה");
+      let updated = [...prev];
+      if (!hasYulia)  updated = [...updated, { id: 101, name: "יוליה",   role: "פרח", phone: "" }];
+      if (!hasMustafa) updated = [...updated, { id: 102, name: "מוסטפה", role: "פרח", phone: "" }];
+      return updated;
+    });
+
+    const restoredAssigned = {
+      // בוקר רוקח
+      "2026-06-07_morning_רוקח": [1],
+      "2026-06-08_morning_רוקח": [6],
+      "2026-06-09_morning_רוקח": [2],
+      "2026-06-10_morning_רוקח": [1],
+      "2026-06-11_morning_רוקח": [4],
+      "2026-06-12_open_רוקח":    [4],
+      "2026-06-12_close_רוקח":   [1, 6],
+      "2026-06-13_morning_רוקח": [2],
+      // בוקר פרח
+      "2026-06-07_morning_פרח":  [7],
+      "2026-06-08_morning_פרח":  [9],
+      "2026-06-09_morning_פרח":  [101],
+      "2026-06-10_morning_פרח":  [101],
+      "2026-06-11_morning_פרח":  [8],
+      "2026-06-12_open_פרח":     [11],
+      // ערב רוקח
+      "2026-06-07_evening_רוקח": [2],
+      "2026-06-08_evening_רוקח": [1],
+      "2026-06-09_evening_רוקח": [1, 6],
+      "2026-06-10_evening_רוקח": [4],
+      "2026-06-11_evening_רוקח": [2, 6],
+      "2026-06-13_evening_רוקח": [4, 6],
+      // ערב פרח
+      "2026-06-07_evening_פרח":  [9],
+      "2026-06-08_evening_פרח":  [102],
+      "2026-06-09_evening_פרח":  [9],
+      "2026-06-10_evening_פרח":  [8],
+      "2026-06-13_evening_פרח":  [9],
+    };
+
+    // שעות מותאמות אישית (empShiftNotes)
+    const restoredEmpShiftNotes = {
+      // סמר — סגירה שישי חריש בעיר
+      "1_2026-06-12_close|st": "11:00", "1_2026-06-12_close|en": "16:00",
+      "1_2026-06-12_close": "חריש בעיר",
+      // סג׳א — ערב ג׳ חריש בעיר
+      "6_2026-06-09_evening|st": "15:00", "6_2026-06-09_evening|en": "22:00",
+      "6_2026-06-09_evening": "חריש בעיר",
+      // סג׳א — ערב ה׳ חריש בעיר
+      "6_2026-06-11_evening|st": "15:00", "6_2026-06-11_evening|en": "22:00",
+      "6_2026-06-11_evening": "חריש בעיר",
+      // סג׳א — ערב שבת חריש בעיר
+      "6_2026-06-13_evening|st": "20:20", "6_2026-06-13_evening|en": "22:00",
+      "6_2026-06-13_evening": "חריש בעיר",
+      // ליאן — שבת ערב
+      "4_2026-06-13_evening|st": "16:30", "4_2026-06-13_evening|en": "23:00",
+      // יאנה — שבת ערב
+      "9_2026-06-13_evening|st": "18:00", "9_2026-06-13_evening|en": "23:00",
+      // סלאם — שבת בוקר
+      "2_2026-06-13_morning|st": "10:00", "2_2026-06-13_morning|en": "16:30",
+    };
+
+    const recovered = { [weekStart]: restoredAssigned };
+    setAssigned(prev => ({...restoredAssigned, ...prev}));
+    setPublishedByWeek(recovered);
+    setPublishedWeekStart(weekStart);
+    setPublished(true);
+    setPublishedAssigned(restoredAssigned);
+    setEmpShiftNotes(prev => ({...restoredEmpShiftNotes, ...prev}));
+
+    setDoc(doc(db, "pharmacy", "schedule"), {
+      assigned: restoredAssigned,
+      publishedByWeek: recovered,
+      publishedWeekStart: weekStart,
+      published: true,
+      publishedAssigned: restoredAssigned,
+      empShiftNotes: restoredEmpShiftNotes,
+    }, { merge: true }).then(() => {
+      showToast("סידור 7.6 שוחזר ✓");
     }).catch(console.error);
   }, [fbLoaded]);
 
