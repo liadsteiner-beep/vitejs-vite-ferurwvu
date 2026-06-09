@@ -965,8 +965,14 @@ export default function App() {
   }
 
   const aKey      = (date,shiftId,role) => `${dateKey(date)}_${shiftId}_${role}`;
-  // מנהלת רואה assigned — עובדים רואים assigned ישירות
-  const getAssigned = (date,shiftId,role) => assigned[aKey(date,shiftId,role)]||[];
+  // מנהלת רואה assigned — עובדים רואים את השבוע המפורסם הרלוונטי
+  const getAssigned = (date,shiftId,role) => {
+    if (currentUser?.isManager) return assigned[aKey(date,shiftId,role)]||[];
+    const weekKey = dateKey(empDisplayDates[0]);
+    const weekSrc = publishedByWeek[weekKey];
+    if (weekSrc) return weekSrc[aKey(date,shiftId,role)]||[];
+    return [];
+  };
 
   const empDisplayDates = showNextWeek && nextWeekPublished ? nextWeekDates : weekDates;
 
@@ -1454,7 +1460,7 @@ export default function App() {
           </div>
 
           <div style={{display:"flex",background:"#f1f5f9",borderRadius:"10px",padding:3,gap:3,marginBottom:12}}>
-            {published && publishedWeekStart === dateKey(empDisplayDates[0]) && <button style={{...S.tab(empTab==="schedule"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("schedule")}>📋 סידור</button>}
+            {published && publishedByWeek[dateKey(empDisplayDates[0])] && <button style={{...S.tab(empTab==="schedule"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("schedule")}>📋 סידור</button>}
             <button style={{...S.tab(empTab==="avail"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("avail")}>✏️ זמינות</button>
             <button style={{...S.tab(empTab==="vac"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("vac")}>🌴 חופשים</button>
             {myRole==="רוקח" && (dutyAvailOpen||dutyPublished) && <button style={{...S.tab(empTab==="duty"),flex:1,borderRadius:7,fontSize:13}} onClick={()=>setEmpTab("duty")}>⭐ תורנות שישי</button>}
@@ -1533,7 +1539,7 @@ export default function App() {
             </div>
           )}
 
-          {empTab==="schedule" && published && publishedWeekStart === dateKey(empDisplayDates[0]) && (
+          {empTab==="schedule" && published && publishedByWeek[dateKey(empDisplayDates[0])] && (
             <div style={{marginTop:4}}>
               {!showNextWeek && (
                 <div style={{fontSize:12,color:"#64748b",marginBottom:8,fontWeight:"500"}}>
