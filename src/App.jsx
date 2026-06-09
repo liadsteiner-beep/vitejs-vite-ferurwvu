@@ -451,7 +451,7 @@ export default function App() {
           "8_2026-06-18_evening": true,
         };
         const finalAv = { ...salamManual, ...sundusManual, ...mergedAv };
-        const manualMissing = [...Object.keys(salamManual), ...Object.keys(sundusManual)].some(k => !mergedAv[k]);
+        const manualMissing = true; // תמיד כתוב — מבטיח עדכון
         if (manualMissing) {
           setDoc(doc(db, "pharmacy", "schedule"), { availability: finalAv }, { merge: true }).catch(console.error);
         }
