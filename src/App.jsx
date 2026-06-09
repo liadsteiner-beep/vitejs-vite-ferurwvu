@@ -338,7 +338,8 @@ export default function App() {
   const [fridayRota, setFridayRota]   = useState([]);
   const [published, setPublished]     = useState(false);
   const [publishedWeekStart, setPublishedWeekStart] = useState(null);
-  const [publishedAssigned, setPublishedAssigned] = useState({});
+  const [publishedAssigned, setPublishedAssigned] = useState({}); // legacy
+  const [publishedByWeek, setPublishedByWeek] = useState({});     // weekStart -> assigned
   const [toast, setToast]             = useState(null);
   const [managerTab, setManagerTab]   = useState("assign");
   const [newEmpName, setNewEmpName]   = useState("");
@@ -441,6 +442,7 @@ export default function App() {
       if (local.published)    setPublished(local.published);
       if (local.publishedWeekStart) setPublishedWeekStart(local.publishedWeekStart);
       if (local.publishedAssigned)   setPublishedAssigned(local.publishedAssigned);
+      if (local.publishedByWeek)     setPublishedByWeek(local.publishedByWeek);
       if (local.dayRemarks)   setDayRemarks(local.dayRemarks);
       if (local.shiftNotes)   setShiftNotes(local.shiftNotes);
       if (local.empShiftNotes) {
@@ -530,6 +532,7 @@ export default function App() {
       if (d.published)    setPublished(d.published);
       if (d.publishedWeekStart) setPublishedWeekStart(d.publishedWeekStart);
       if (d.publishedAssigned)   setPublishedAssigned(d.publishedAssigned);
+      if (d.publishedByWeek)     setPublishedByWeek(d.publishedByWeek);
       if (d.dayRemarks)   setDayRemarks(d.dayRemarks);
       if (d.shiftNotes)   setShiftNotes(d.shiftNotes);
       if (d.vacations)    setVacations(d.vacations);
@@ -631,11 +634,21 @@ export default function App() {
   useEffect(() => {
     if (!fbLoaded) return;
     // שמור הכל חוץ מ-availability — זמינות נשמרת רק על ידי העובדים עצמם
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, publishedWeekStart, publishedAssigned, dayRemarks, shiftNotes, vacations, empShiftNotes, dutyPeriod, dutyAvail, dutyAssign, dutyPublished, dutyAvailOpen, dutySetupStep })); } catch {}
-    fbSave({ employees, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, publishedWeekStart, publishedAssigned, dayRemarks, shiftNotes, vacations, empShiftNotes, dutyPeriod, dutyAssign, dutyPublished, dutyAvailOpen, dutySetupStep });
-  }, [employees, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, publishedWeekStart, publishedAssigned, dayRemarks, shiftNotes, vacations, empShiftNotes, dutyPeriod, dutyAssign, dutyPublished, dutyAvailOpen, dutySetupStep]);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ employees, availability, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, publishedWeekStart, publishedAssigned, publishedByWeek, dayRemarks, shiftNotes, vacations, empShiftNotes, dutyPeriod, dutyAvail, dutyAssign, dutyPublished, dutyAvailOpen, dutySetupStep })); } catch {}
+    fbSave({ employees, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, publishedWeekStart, publishedAssigned, publishedByWeek, dayRemarks, shiftNotes, vacations, empShiftNotes, dutyPeriod, dutyAssign, dutyPublished, dutyAvailOpen, dutySetupStep });
+  }, [employees, assigned, notes, empNotes, empPasswords, managerPassword, fridayRota, published, publishedWeekStart, publishedAssigned, publishedByWeek, dayRemarks, shiftNotes, vacations, empShiftNotes, dutyPeriod, dutyAssign, dutyPublished, dutyAvailOpen, dutySetupStep]);
 
   function showToast(msg, type="ok") { setToast({msg,type}); setTimeout(()=>setToast(null),3000); }
+
+  // שחזור: אם publishedByWeek ריק אבל יש assigned ו-publishedWeekStart — שחזר
+  useEffect(() => {
+    if (!fbLoaded) return;
+    if (Object.keys(publishedByWeek).length === 0 && publishedWeekStart && Object.keys(assigned).length > 0) {
+      const recovered = { [publishedWeekStart]: assigned };
+      setPublishedByWeek(recovered);
+      setDoc(doc(db, "pharmacy", "schedule"), { publishedByWeek: recovered }, { merge: true }).catch(console.error);
+    }
+  }, [fbLoaded]);
 
   function loginManager() {
     if (pwInput === managerPassword) {
@@ -871,9 +884,13 @@ export default function App() {
   // עובדים רואים רק שיבוץ שפורסם — מנהלת רואה את השיבוץ הפעיל
   const getAssigned = (date,shiftId,role) => {
     if (currentUser?.isManager) return assigned[aKey(date,shiftId,role)]||[];
-    // לעובד — השתמש בפרסום האחרון; אם ריק תן fallback ל-assigned
-    const src = Object.keys(publishedAssigned).length > 0 ? publishedAssigned : assigned;
-    return src[aKey(date,shiftId,role)]||[];
+    // לעובד — חפש בהיסטוריית הפרסומים לפי שבוע
+    const weekKey = dateKey(empDisplayDates[0]);
+    const weekSrc = publishedByWeek[weekKey];
+    if (weekSrc) return weekSrc[aKey(date,shiftId,role)]||[];
+    // fallback: legacy publishedAssigned או assigned
+    if (Object.keys(publishedAssigned).length > 0) return publishedAssigned[aKey(date,shiftId,role)]||[];
+    return assigned[aKey(date,shiftId,role)]||[];
   };
 
   const empDisplayDates = showNextWeek && nextWeekPublished ? nextWeekDates : weekDates;
@@ -2653,15 +2670,20 @@ export default function App() {
               <div style={S.sTitle}>📤 שלח סידור</div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 <button style={{...S.btn(published?"#22c55e":"#0ea5e9"),padding:12,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{
-                  setPublished(true);
                   const pubWeekStart = dateKey(weekDates[0]);
+                  setPublished(true);
                   setPublishedWeekStart(pubWeekStart);
                   setPublishedAssigned({...assigned});
-                  setDoc(doc(db,"pharmacy","schedule"), {
-                    published: true,
-                    publishedWeekStart: pubWeekStart,
-                    publishedAssigned: assigned
-                  }, {merge:true}).catch(()=>{});
+                  setPublishedByWeek(prev => {
+                    const updated = {...prev, [pubWeekStart]: assigned};
+                    setDoc(doc(db,"pharmacy","schedule"), {
+                      published: true,
+                      publishedWeekStart: pubWeekStart,
+                      publishedAssigned: assigned,
+                      publishedByWeek: updated
+                    }, {merge:true}).catch(()=>{});
+                    return updated;
+                  });
                   showToast("פורסם ✓");
                 }}>
                   {published?"✓ פורסם באפליקציה":"✅ פרסם באפליקציה לעובדים"}
