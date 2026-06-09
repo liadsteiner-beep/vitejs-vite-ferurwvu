@@ -323,7 +323,14 @@ export default function App() {
   const [fbLoaded, setFbLoaded] = useState(false);
   const [showAutoConfirm, setShowAutoConfirm] = useState(false);
   const [sendMode, setSendMode] = useState("personal");
-  const [weekOffset, setWeekOffset] = useState(new Date().getDay() >= 4 ? 1 : 0);
+  const [weekOffset, setWeekOffset] = useState(() => {
+    const now = new Date();
+    const day = now.getDay();
+    const hour = now.getHours();
+    // אחרי שלישי 12:00 — הזמינות לשבוע הנוכחי נעולה, פתח שבוע הבא
+    if (day > 2 || (day === 2 && hour >= 12)) return 1;
+    return 0;
+  });
   const [vacations, setVacations] = useState({});
   const [newRotaDate, setNewRotaDate] = useState("");
   const [newRotaOpen, setNewRotaOpen] = useState("");
