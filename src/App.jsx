@@ -708,7 +708,7 @@ export default function App() {
   }
 
   // Open time edit modal
-  const dblClickRef = React.useRef ? React.useRef({}) : { current: {} };
+  const dblClickRef = useRef({});
 
   function handleEmpClickWithDbl(empId, date, shiftId, onSingleClick) {
     const key = empId + "_" + dateKey(date) + "_" + shiftId;
