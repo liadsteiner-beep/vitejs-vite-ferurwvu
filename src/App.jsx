@@ -126,11 +126,25 @@ function isPastDeadline(offsetWeeks = 0) { return new Date() > getDeadline(offse
 const WEEK_DATES = getWeekDates(0);
 
 // ─── AUTO-ASSIGN ALGORITHM ───────────────────────────────────────────────────
-function autoAssign(employees, availability, fridayRota, assigned, weekDates) {
+function autoAssign(employees, availability, fridayRota, assigned, weekDates, weekBudget) {
   const newAssigned = { ...assigned };
   const getA = (date, shiftId, role) => newAssigned[`${dateKey(date)}_${shiftId}_${role}`] || [];
   const setA = (date, shiftId, role, ids) => { newAssigned[`${dateKey(date)}_${shiftId}_${role}`] = ids; };
   const isAv = (empId, date, shiftId) => !!availability[`${empId}_${dateKey(date)}_${shiftId}`];
+
+  const DEFAULT_BUDGET = [
+    { name: "סמר",  min: 4, max: 5 },
+    { name: "סלאם", min: 4, max: 4 },
+    { name: "שפא",  min: 2, max: 2 },
+    { name: "ליאן", min: 3, max: 4 },
+    { name: "עדי",  min: 0, max: 0 },
+    { name: "סג׳א", min: 0, max: 99 },
+    { name: "ליעד", min: 0, max: 99 },
+  ];
+  function getBudget(emp) {
+    if (weekBudget && weekBudget[emp.id]) return weekBudget[emp.id];
+    return DEFAULT_BUDGET.find(b => b.name === emp.name) || { min: 0, max: 99 };
+  }
 
   const countShifts = (empId) => {
     let total = 0, morning = 0, evening = 0;
@@ -204,22 +218,30 @@ function autoAssign(employees, availability, fridayRota, assigned, weekDates) {
           if (!isAv(emp.id, date, shift.id)) return false;
           if (worksToday(emp.id, date)) return false;
           if (isMorning && hadEveningYesterday(emp.id, date)) return false;
-          const budget = BUDGET.find(b => b.name === emp.name);
-          if (budget && budget.max === 0) return false;
+          const budget = getBudget(emp);
+          if (budget.max === 0) return false;
           const { total } = countShifts(emp.id);
-          if (budget && total >= budget.max) return false;
+          if (total >= budget.max) return false;
+          return true;
+        })
+        .filter(emp => {
+          // אם כבר יש לו בוקר ומקסימום ≤ 2 — לא לתת עוד בוקר
+          const budget = getBudget(emp);
+          const c = countShifts(emp.id);
+          if (isMorning && budget.max <= 2 && c.morning >= 1) return false;
+          if (!isMorning && budget.max <= 2 && c.evening >= 1) return false;
           return true;
         })
         .sort((a, b) => {
-          const bA = BUDGET.find(x => x.name === a.name) || { min:0, max:99 };
-          const bB = BUDGET.find(x => x.name === b.name) || { min:0, max:99 };
+          const bA = getBudget(a);
+          const bB = getBudget(b);
           const cA = countShifts(a.id);
           const cB = countShifts(b.id);
           const ratioA = isMorning ? cA.morning - cA.evening : cA.evening - cA.morning;
           const ratioB = isMorning ? cB.morning - cB.evening : cB.evening - cB.morning;
           if (ratioA !== ratioB) return ratioA - ratioB;
-          const needA = bA.min - cA.total;
-          const needB = bB.min - cB.total;
+          const needA = (bA.min||0) - cA.total;
+          const needB = (bB.min||0) - cB.total;
           if (needB !== needA) return needB - needA;
           return cA.total - cB.total;
         });
@@ -368,6 +390,12 @@ export default function App() {
   const lastEmpClickRef = useRef({id:null, time:0, date:null, sh:null});
   const [scheduleChanged, setScheduleChanged] = useState(false);
   const [scheduleChangeDiff, setScheduleChangeDiff] = useState([]); // [{dateStr, shiftId, role, added[], removed[]}]
+  const [weekBudget, setWeekBudget] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pharmacy_week_budget");
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
   const [dutyPublishedSeen, setDutyPublishedSeen] = useState(() => {
     try { return localStorage.getItem("duty_published_seen_v1") === "true"; } catch { return false; }
   });
@@ -908,7 +936,7 @@ export default function App() {
     showToast("שיבוץ עודכן ✓");
   }
   function runAutoAssign() {
-    const result = autoAssign(employees, availability, fridayRota, assigned, weekDates);
+    const result = autoAssign(employees, availability, fridayRota, assigned, weekDates, weekBudget);
     setAssigned(result);
     setShowAutoConfirm(false);
     showToast("שיבוץ אוטומטי הושלם ✓");
@@ -3064,6 +3092,45 @@ export default function App() {
             </div>
 
             <div style={S.card}>
+              <div style={{...S.card, marginBottom:12}}>
+                <div style={S.sTitle}>📊 הקצאת משמרות שבועית</div>
+                <div style={{fontSize:11,color:"#64748b",marginBottom:10}}>מינימום / מקסימום משמרות לכל רוקח השבוע. שינויים ישפיעו על השיבוץ האוטומטי.</div>
+                {employees.filter(e=>e.role==="רוקח").map(emp=>{
+                  const defaultB = [{name:"סמר",min:4,max:5},{name:"סלאם",min:4,max:4},{name:"שפא",min:2,max:2},{name:"ליאן",min:3,max:4},{name:"עדי",min:0,max:0},{name:"סג׳א",min:0,max:99},{name:"ליעד",min:0,max:99}].find(b=>b.name===emp.name)||{min:0,max:99};
+                  const cur = (weekBudget||{})[emp.id] || defaultB;
+                  return (
+                    <div key={emp.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:"0.5px solid #f1f5f9",gap:8}}>
+                      <span style={{fontSize:13,fontWeight:"700",flex:1}}>{emp.name}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:4}}>
+                        <span style={{fontSize:11,color:"#94a3b8"}}>מינ׳</span>
+                        <input type="number" min="0" max="7"
+                          style={{width:44,fontSize:13,padding:"3px 6px",border:"1.5px solid #e2e8f0",borderRadius:7,textAlign:"center",fontWeight:"700"}}
+                          value={cur.min}
+                          onChange={e=>{
+                            const v=parseInt(e.target.value)||0;
+                            const updated={...(weekBudget||{}),[emp.id]:{...cur,min:v}};
+                            setWeekBudget(updated);
+                            try{localStorage.setItem("pharmacy_week_budget",JSON.stringify(updated));}catch{}
+                          }}
+                        />
+                        <span style={{fontSize:11,color:"#94a3b8"}}>מקס׳</span>
+                        <input type="number" min="0" max="7"
+                          style={{width:44,fontSize:13,padding:"3px 6px",border:"1.5px solid #e2e8f0",borderRadius:7,textAlign:"center",fontWeight:"700"}}
+                          value={cur.max===99?7:cur.max}
+                          onChange={e=>{
+                            const v=parseInt(e.target.value)||0;
+                            const updated={...(weekBudget||{}),[emp.id]:{...cur,max:v===7?99:v}};
+                            setWeekBudget(updated);
+                            try{localStorage.setItem("pharmacy_week_budget",JSON.stringify(updated));}catch{}
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                <button style={{...S.btnSm("#94a3b8"),marginTop:8}} onClick={()=>{setWeekBudget(null);try{localStorage.removeItem("pharmacy_week_budget");}catch{}showToast("אופס לברירת מחדל ✓");}}>אפס לברירת מחדל</button>
+              </div>
+
               <div style={S.sTitle}>⏰ נעילת שיבוץ</div>
               <div style={{fontSize:13,color:"#64748b"}}>
                 עד <strong>יום שלישי 12:00</strong> — לאחר מכן רק מנהל/ת יכול/ה לשנות.<br/>
