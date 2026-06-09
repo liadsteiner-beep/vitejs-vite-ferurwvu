@@ -643,14 +643,31 @@ export default function App() {
 
   function showToast(msg, type="ok") { setToast({msg,type}); setTimeout(()=>setToast(null),3000); }
 
-  // שחזור: אם publishedByWeek ריק אבל יש assigned ו-publishedWeekStart — שחזר
+  // שחזור חירום: אם publishedByWeek ריק — כתוב ישירות מ-Firebase
   useEffect(() => {
     if (!fbLoaded) return;
-    if (Object.keys(publishedByWeek).length === 0 && publishedWeekStart && Object.keys(assigned).length > 0) {
-      const recovered = { [publishedWeekStart]: assigned };
+    if (Object.keys(publishedByWeek).length > 0) return; // כבר יש נתונים
+    // טען ישירות מ-Firebase
+    getDoc(doc(db, "pharmacy", "schedule")).then(snap => {
+      if (!snap.exists()) return;
+      const d = snap.data();
+      if (!d.assigned || Object.keys(d.assigned).length === 0) return;
+      const weekStart = "2026-06-07"; // שבוע 7.6
+      const recovered = { [weekStart]: d.assigned };
       setPublishedByWeek(recovered);
-      setDoc(doc(db, "pharmacy", "schedule"), { publishedByWeek: recovered }, { merge: true }).catch(console.error);
-    }
+      setPublishedWeekStart(weekStart);
+      setPublished(true);
+      setPublishedAssigned(d.assigned);
+      setAssigned(d.assigned);
+      setDoc(doc(db, "pharmacy", "schedule"), {
+        publishedByWeek: recovered,
+        publishedWeekStart: weekStart,
+        published: true,
+        publishedAssigned: d.assigned
+      }, { merge: true }).then(() => {
+        showToast("סידור שוחזר ✓");
+      }).catch(console.error);
+    }).catch(console.error);
   }, [fbLoaded]);
 
   function loginManager() {
