@@ -646,9 +646,9 @@ export default function App() {
   // ── שחזור סידור 7.6–13.6 ──
   useEffect(() => {
     if (!fbLoaded) return;
-    if (Object.keys(publishedByWeek).length > 0) return;
-
+    // תמיד שחזר את שבוע 7.6 אם חסר
     const weekStart = "2026-06-07";
+    if (publishedByWeek[weekStart] && Object.keys(publishedByWeek[weekStart]).length > 0) return;
 
     // הוסף יוליה ומוסטפה אם לא קיימים
     setEmployees(prev => {
