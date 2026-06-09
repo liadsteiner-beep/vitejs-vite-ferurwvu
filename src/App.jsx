@@ -2507,8 +2507,18 @@ export default function App() {
                                       onDragOver={e=>e.preventDefault()}
                                       onDrop={e=>{ e.preventDefault(); handleDrop(date,shift.id,role,emp.id); }}
                                       className="emp-btn emp-avail"
-                                      onClick={()=>handleEmpClickWithDbl(emp.id,date,shift.id,()=>toggleAssign(date,shift.id,role,emp.id))}
-                                      title="לחיצה — שבץ • לחיצה כפולה — הסר זמינות"
+                                      onClick={()=>toggleAssign(date,shift.id,role,emp.id)}
+                                      onContextMenu={e=>{
+                                        e.preventDefault();
+                                        const k = avKey(emp.id,date,shift.id);
+                                        setAvailability(prev=>{
+                                          const updated={...prev,[k]:false};
+                                          setDoc(doc(db,"pharmacy","schedule"),{availability:updated},{merge:true}).catch(console.error);
+                                          return updated;
+                                        });
+                                        showToast(`זמינות ${emp.name} הוסרה ✓`);
+                                      }}
+                                      title="לחיצה — שבץ • לחיצה ימנית — הסר זמינות"
                                       style={{borderRadius:"6px",padding:"3px 5px",fontSize:10,fontWeight:"500",color:"#1e40af",cursor:"pointer",width:"100%",transition:"all 0.15s",background:"#dbeafe",border:"1px dashed #3b82f6"}}>
                                       + {emp.name}
                                     </button>
