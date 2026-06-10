@@ -1415,8 +1415,7 @@ export default function App() {
           </div>
 
           <div style={{display:"flex",background:"#f1f5f9",borderRadius:"10px",padding:3,gap:3,marginBottom:12}}>
-            {published && Object.keys(publishedByWeek).length > 0 && publishedByWeek[dateKey(empDisplayDates[0])] && <button style={{...S.tab(empTab==="schedule"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("schedule")}>📋 סידור</button>}
-            {published && Object.keys(publishedByWeek).length > 0 && !publishedByWeek[dateKey(empDisplayDates[0])] && publishedWeekStart && <button style={{...S.tab(empTab==="schedule"),flex:1,borderRadius:7,fontSize:14,opacity:0.5}} onClick={()=>{const pubD=new Date(publishedWeekStart);const curD=getSchedulingWeekStart(0);const diff=Math.round((pubD-curD)/(7*24*3600*1000));setWeekOffset(diff);setEmpTab("schedule");}}>📋 סידור</button>}
+            {published && <button style={{...S.tab(empTab==="schedule"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("schedule")}>📋 סידור</button>}
             <button style={{...S.tab(empTab==="avail"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("avail")}>✏️ זמינות</button>
             <button style={{...S.tab(empTab==="vac"),flex:1,borderRadius:7,fontSize:14}} onClick={()=>setEmpTab("vac")}>🌴 חופשים</button>
             {myRole==="רוקח" && (dutyAvailOpen||dutyPublished) && <button style={{...S.tab(empTab==="duty"),flex:1,borderRadius:7,fontSize:13}} onClick={()=>setEmpTab("duty")}>⭐ תורנות שישי</button>}
@@ -1495,7 +1494,7 @@ export default function App() {
             </div>
           )}
 
-          {empTab==="schedule" && published && (publishedByWeek[dateKey(empDisplayDates[0])] || publishedWeekStart === dateKey(empDisplayDates[0])) && (
+          {empTab==="schedule" && published && (
             <div style={{marginTop:4}}>
               {!showNextWeek && (
                 <div style={{fontSize:12,color:"#64748b",marginBottom:8,fontWeight:"500"}}>
