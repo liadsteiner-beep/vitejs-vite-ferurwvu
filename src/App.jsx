@@ -379,6 +379,9 @@ export default function App() {
   const nextWeekDates = getWeekDates(1);
   const nextWeekStart = dateKey(nextWeekDates[0]);
   const nextWeekPublished = published && publishedWeekStart === nextWeekStart;
+  // האם הסידור פורסם לשבוע הנוכחי שהעובד רואה
+  const currentViewWeekStart = dateKey(weekDates[0]);
+  const currentWeekPublished = published && publishedWeekStart === currentViewWeekStart;
   const [dayRemarks, setDayRemarks] = useState({});
   const [shiftNotes, setShiftNotes] = useState({});
   const [empShiftNotes, setEmpShiftNotes] = useState({});
@@ -1494,7 +1497,7 @@ export default function App() {
             </div>
           )}
 
-          {empTab==="schedule" && !published && (
+          {empTab==="schedule" && !currentWeekPublished && (
             <div>
               <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:10,padding:"9px 12px",marginBottom:10,textAlign:"center"}}>
                 <div style={{fontSize:13,fontWeight:"700",color:"#92400e"}}>📋 הסידור טרם פורסם</div>
@@ -1573,7 +1576,7 @@ export default function App() {
             </div>
           )}
 
-          {empTab==="schedule" && published && (
+          {empTab==="schedule" && currentWeekPublished && (
             <div style={{marginTop:4}}>
               {!showNextWeek && (
                 <div style={{fontSize:12,color:"#64748b",marginBottom:8,fontWeight:"500"}}>
