@@ -1504,6 +1504,7 @@ export default function App() {
                 <div style={{fontSize:11,color:"#b45309",marginTop:2}}>סמן/י זמינות לשבוע {formatDateShort(weekDates[0])}–{formatDateShort(weekDates[6])}</div>
               </div>
               {(()=>{
+                // בדוק זמינויות לשבוע המוצג הנוכחי בלבד
                 const totalSel = weekDates.reduce((acc,date)=>(DAY_SHIFTS[date.getDay()]||[]).filter(sh=>(sh.slots[myRole]||0)>0&&isAv(currentUser.id,date,sh.id)).length+acc,0);
                 const hasSel = totalSel > 0;
                 if (hasSel) return (
@@ -1522,14 +1523,12 @@ export default function App() {
                         <thead>
                           <tr>
                             <th style={{background:"#f8fafc",padding:"6px 2px",border:"0.5px solid #e2e8f0",textAlign:"center",fontWeight:"700",color:"#334155",fontSize:11,width:36}}></th>
-                            {weekDates.map(date=>{
-                              const hasShifts=(DAY_SHIFTS[date.getDay()]||[]).some(sh=>(sh.slots[myRole]||0)>0);
-                              if(!hasShifts) return null;
-                              return <th key={dateKey(date)} style={{background:"#f8fafc",padding:"5px 1px",border:"0.5px solid #e2e8f0",textAlign:"center",fontWeight:"700",color:"#334155",fontSize:11}}>
+                            {weekDates.map(date=>(
+                              <th key={dateKey(date)} style={{background:"#f8fafc",padding:"5px 1px",border:"0.5px solid #e2e8f0",textAlign:"center",fontWeight:"700",color:"#334155",fontSize:11}}>
                                 {date.toLocaleDateString("he-IL",{weekday:"narrow"})}
                                 <br/><span style={{fontSize:9,color:"#94a3b8",fontWeight:"400"}}>{formatDateShort(date)}</span>
-                              </th>;
-                            })}
+                              </th>
+                            ))}
                           </tr>
                         </thead>
                         <tbody>
@@ -1541,7 +1540,7 @@ export default function App() {
                                 <td style={{fontSize:10,fontWeight:"700",color:"#475569",background:"#f8fafc",padding:"2px 3px",border:"0.5px solid #e2e8f0",verticalAlign:"middle"}}>{shType.label}</td>
                                 {weekDates.map(date=>{
                                   const shift=(DAY_SHIFTS[date.getDay()]||[]).find(sh=>sh.id===shType.id&&(sh.slots[myRole]||0)>0);
-                                  if(!shift) return null;
+                                  if(!shift) return <td key={dateKey(date)} style={{padding:2,border:"0.5px solid #e2e8f0",textAlign:"center",background:"#f8fafc",color:"#e2e8f0",fontSize:10}}>—</td>;
                                   const onVac=isOnVacation(currentUser.id,date);
                                   if(onVac) return <td key={dateKey(date)} style={{padding:2,border:"0.5px solid #e2e8f0",textAlign:"center",background:"#d1fae5",fontSize:13}}>🌴</td>;
                                   const active=isAv(currentUser.id,date,shift.id);
