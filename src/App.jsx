@@ -1494,6 +1494,85 @@ export default function App() {
             </div>
           )}
 
+          {empTab==="schedule" && !published && (
+            <div>
+              <div style={{background:"#fffbeb",border:"1.5px solid #fcd34d",borderRadius:10,padding:"9px 12px",marginBottom:10,textAlign:"center"}}>
+                <div style={{fontSize:13,fontWeight:"700",color:"#92400e"}}>📋 הסידור טרם פורסם</div>
+                <div style={{fontSize:11,color:"#b45309",marginTop:2}}>סמן/י זמינות לשבוע {formatDateShort(weekDates[0])}–{formatDateShort(weekDates[6])}</div>
+              </div>
+              {(()=>{
+                const totalSel = weekDates.reduce((acc,date)=>(DAY_SHIFTS[date.getDay()]||[]).filter(sh=>(sh.slots[myRole]||0)>0&&isAv(currentUser.id,date,sh.id)).length+acc,0);
+                const hasSel = totalSel > 0;
+                if (hasSel) return (
+                  <div style={{textAlign:"center",padding:"32px 14px"}}>
+                    <div style={{fontSize:64,marginBottom:12}}>📝</div>
+                    <div style={{fontSize:16,fontWeight:"700",color:"#15803d",marginBottom:6}}>הזמינות נשלחה!</div>
+                    <div style={{fontSize:12,color:"#64748b",lineHeight:1.7,marginBottom:20}}>כשיפורסם הסידור<br/>ניתן יהיה לצפות בו באפליקציה</div>
+                    <button style={{...S.btn("#f1f5f9","#475569"),border:"1px solid #e2e8f0",fontSize:12}} onClick={()=>setEmpTab("avail")}>✏️ ערוך/י זמינות</button>
+                  </div>
+                );
+                return (
+                  <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:10}}>
+                    <div style={{fontSize:11,fontWeight:"700",color:"#334155",marginBottom:8}}>✏️ סמן/י זמינות לשבוע {formatDateShort(weekDates[0])}–{formatDateShort(weekDates[6])}</div>
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}}>
+                        <thead>
+                          <tr>
+                            <th style={{background:"#f8fafc",padding:"6px 2px",border:"0.5px solid #e2e8f0",textAlign:"center",fontWeight:"700",color:"#334155",fontSize:11,width:36}}></th>
+                            {weekDates.map(date=>{
+                              const hasShifts=(DAY_SHIFTS[date.getDay()]||[]).some(sh=>(sh.slots[myRole]||0)>0);
+                              if(!hasShifts) return null;
+                              return <th key={dateKey(date)} style={{background:"#f8fafc",padding:"5px 1px",border:"0.5px solid #e2e8f0",textAlign:"center",fontWeight:"700",color:"#334155",fontSize:11}}>
+                                {date.toLocaleDateString("he-IL",{weekday:"narrow"})}
+                                <br/><span style={{fontSize:9,color:"#94a3b8",fontWeight:"400"}}>{formatDateShort(date)}</span>
+                              </th>;
+                            })}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[{id:"morning",label:"☀️ בוקר"},{id:"evening",label:"🌙 ערב"},{id:"open",label:"☀️ פתיחה"},{id:"close",label:"🌙 סגירה"}].map(shType=>{
+                            const hasShift=weekDates.some(date=>(DAY_SHIFTS[date.getDay()]||[]).some(sh=>sh.id===shType.id&&(sh.slots[myRole]||0)>0));
+                            if(!hasShift) return null;
+                            return (
+                              <tr key={shType.id}>
+                                <td style={{fontSize:10,fontWeight:"700",color:"#475569",background:"#f8fafc",padding:"2px 3px",border:"0.5px solid #e2e8f0",verticalAlign:"middle"}}>{shType.label}</td>
+                                {weekDates.map(date=>{
+                                  const shift=(DAY_SHIFTS[date.getDay()]||[]).find(sh=>sh.id===shType.id&&(sh.slots[myRole]||0)>0);
+                                  if(!shift) return null;
+                                  const onVac=isOnVacation(currentUser.id,date);
+                                  if(onVac) return <td key={dateKey(date)} style={{padding:2,border:"0.5px solid #e2e8f0",textAlign:"center",background:"#d1fae5",fontSize:13}}>🌴</td>;
+                                  const active=isAv(currentUser.id,date,shift.id);
+                                  const lkd=isPastDeadline(weekOffset);
+                                  return (
+                                    <td key={dateKey(date)} style={{padding:2,border:"0.5px solid #e2e8f0",textAlign:"center"}}>
+                                      <button
+                                        onClick={()=>!lkd&&toggleAv(date,shift.id)}
+                                        style={{
+                                          borderRadius:7,padding:"9px 0",fontSize:13,fontWeight:"700",
+                                          cursor:lkd?"default":"pointer",width:"100%",
+                                          border:active?"2px solid #0ea5e9":"2px dashed #e2e8f0",
+                                          background:active?"#0ea5e9":"transparent",
+                                          color:active?"#fff":"#cbd5e1",
+                                          transition:"all 0.12s",
+                                        }}>
+                                        {active?"✓":"+"}
+                                      </button>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div style={{fontSize:10,color:"#94a3b8",marginTop:7,textAlign:"center"}}>נשמר אוטומטית • ניתן לשנות עד שלישי 12:00</div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {empTab==="schedule" && published && (
             <div style={{marginTop:4}}>
               {!showNextWeek && (
