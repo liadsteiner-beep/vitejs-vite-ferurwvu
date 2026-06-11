@@ -126,7 +126,7 @@ function isPastDeadline(offsetWeeks = 0) { return new Date() > getDeadline(offse
 const WEEK_DATES = getWeekDates(0);
 
 // ─── AUTO-ASSIGN ALGORITHM ───────────────────────────────────────────────────
-function autoAssign(employees, availability, fridayRota, assigned, weekDates, weekBudget) {
+function autoAssign(employees, availability, fridayRota, assigned, weekDates, weekBudget, shuffleSeed) {
   const newAssigned = { ...assigned };
   const getA = (date, shiftId, role) => newAssigned[`${dateKey(date)}_${shiftId}_${role}`] || [];
   const setA = (date, shiftId, role, ids) => { newAssigned[`${dateKey(date)}_${shiftId}_${role}`] = ids; };
@@ -247,7 +247,12 @@ function autoAssign(employees, availability, fridayRota, assigned, weekDates, we
         });
 
       if (candidates.length > 0) {
-        setA(date, shift.id, "רוקח", [...current, candidates[0].id]);
+        if (candidates.length > 0) {
+          const pick = (shuffleSeed && candidates.length > 1)
+            ? candidates[shuffleSeed % Math.min(candidates.length, 3)]
+            : candidates[0];
+          setA(date, shift.id, "רוקח", [...current, (pick||candidates[0]).id]);
+        }
       }
     });
   });
@@ -278,7 +283,10 @@ function autoAssign(employees, availability, fridayRota, assigned, weekDates, we
           return cA.total - cB.total;
         });
       if (candidates.length > 0) {
-        setA(date, shift.id, "פרח", [...current, candidates[0].id]);
+        const pickP = (shuffleSeed && candidates.length > 1)
+          ? candidates[shuffleSeed % Math.min(candidates.length, 3)]
+          : candidates[0];
+        setA(date, shift.id, "פרח", [...current, (pickP||candidates[0]).id]);
       }
     });
   });
@@ -348,6 +356,7 @@ export default function App() {
   const [empNoteInput, setEmpNoteInput] = useState("");
   const [fbLoaded, setFbLoaded] = useState(false);
   const [showAutoConfirm, setShowAutoConfirm] = useState(false);
+  const [autoAssignSeed, setAutoAssignSeed] = useState(0);
   const [sendMode, setSendMode] = useState("personal");
   const [weekOffset, setWeekOffset] = useState(() => {
     const now = new Date();
@@ -381,7 +390,8 @@ export default function App() {
   const nextWeekPublished = published && publishedWeekStart === nextWeekStart;
   // האם הסידור פורסם לשבוע הנוכחי שהעובד רואה
   const currentViewWeekStart = dateKey(weekDates[0]);
-  const currentWeekPublished = published && publishedWeekStart === currentViewWeekStart;
+  const currentWeekPublished = !!(publishedByWeek[currentViewWeekStart] && Object.keys(publishedByWeek[currentViewWeekStart]).length > 0) ||
+    (published && publishedWeekStart === currentViewWeekStart);
   const [dayRemarks, setDayRemarks] = useState({});
   const [shiftNotes, setShiftNotes] = useState({});
   const [empShiftNotes, setEmpShiftNotes] = useState({});
@@ -989,7 +999,9 @@ export default function App() {
     showToast("שיבוץ עודכן ✓");
   }
   function runAutoAssign() {
-    const result = autoAssign(employees, availability, fridayRota, assigned, weekDates, weekBudget);
+    const newSeed = autoAssignSeed + 1;
+    setAutoAssignSeed(newSeed);
+    const result = autoAssign(employees, availability, fridayRota, {}, weekDates, weekBudget, newSeed);
     setAssigned(result);
     setShowAutoConfirm(false);
     showToast("שיבוץ אוטומטי הושלם ✓");
@@ -2609,11 +2621,11 @@ export default function App() {
                                   return (
                                     <div key={id} data-empid={id} style={{position:"relative"}}
                                       onMouseEnter={()=>{
-                                        document.querySelectorAll(`[data-empid="${id}"]`).forEach(el=>el.classList.add("emp-hov"));
+                                        document.querySelectorAll(`[data-empid="${id}"]`).forEach(el=>{ if(el.dataset.empid===String(id)) el.classList.add("emp-hov"); });
                                         document.getElementById("assign-table")?.classList.add("emp-hovering");
                                       }}
                                       onMouseLeave={()=>{
-                                        document.querySelectorAll(`[data-empid="${id}"]`).forEach(el=>el.classList.remove("emp-hov"));
+                                        document.querySelectorAll(`[data-empid="${id}"]`).forEach(el=>{ if(el.dataset.empid===String(id)) el.classList.remove("emp-hov"); });
                                         document.getElementById("assign-table")?.classList.remove("emp-hovering");
                                         if(pressTimer) clearTimeout(pressTimer);
                                       }}>
@@ -2669,11 +2681,11 @@ export default function App() {
                                 {avail.filter(e=>!assignedIds.includes(e.id)).map(emp=>(
                                   <div key={emp.id} data-empid={emp.id}
                                     onMouseEnter={()=>{
-                                      document.querySelectorAll(`[data-empid="${emp.id}"]`).forEach(el=>el.classList.add("emp-hov"));
+                                      document.querySelectorAll(`[data-empid="${emp.id}"]`).forEach(el=>{ if(el.dataset.empid===String(emp.id)) el.classList.add("emp-hov"); });
                                       document.getElementById("assign-table")?.classList.add("emp-hovering");
                                     }}
                                     onMouseLeave={()=>{
-                                      document.querySelectorAll(`[data-empid="${emp.id}"]`).forEach(el=>el.classList.remove("emp-hov"));
+                                      document.querySelectorAll(`[data-empid="${emp.id}"]`).forEach(el=>{ if(el.dataset.empid===String(emp.id)) el.classList.remove("emp-hov"); });
                                       document.getElementById("assign-table")?.classList.remove("emp-hovering");
                                     }}>
                                     <div style={{display:"flex",gap:2,alignItems:"center"}}>
