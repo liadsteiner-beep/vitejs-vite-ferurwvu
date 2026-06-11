@@ -537,6 +537,16 @@ export default function App() {
       if (d.publishedAssigned)   setPublishedAssigned(d.publishedAssigned);
       if (d.publishedByWeek)     setPublishedByWeek(d.publishedByWeek);
 
+      // ── גיבוי סידורים פורסמו לתוך publishedByWeek אם חסרים ──
+      if (d.assigned && d.publishedWeekStart && Object.keys(d.assigned).length > 0) {
+        const pbw = d.publishedByWeek || {};
+        if (!pbw[d.publishedWeekStart] || Object.keys(pbw[d.publishedWeekStart]).length === 0) {
+          const updatedPbw = { ...pbw, [d.publishedWeekStart]: d.assigned };
+          setPublishedByWeek(updatedPbw);
+          setDoc(doc(db, "pharmacy", "schedule"), { publishedByWeek: updatedPbw }, { merge: true }).catch(console.error);
+        }
+      }
+
             if (d.dayRemarks)   setDayRemarks(d.dayRemarks);
       if (d.shiftNotes)   setShiftNotes(d.shiftNotes);
       if (d.vacations)    setVacations(d.vacations);
@@ -905,7 +915,10 @@ export default function App() {
   }
 
   const aKey      = (date,shiftId,role) => `${dateKey(date)}_${shiftId}_${role}`;
-  const getAssigned = (date,shiftId,role) => assigned[aKey(date,shiftId,role)]||[];
+  // השתמש ב-publishedByWeek לפי השבוע המוצג — כך סידורים ישנים לא יידרסו
+  const viewWeekKey = dateKey(weekDates[0]);
+  const assignedForView = publishedByWeek[viewWeekKey] || assigned;
+  const getAssigned = (date,shiftId,role) => assignedForView[aKey(date,shiftId,role)]||[];
 
   const empDisplayDates = showNextWeek && nextWeekPublished ? nextWeekDates : weekDates;
 
@@ -3273,6 +3286,26 @@ export default function App() {
 
             <div style={S.card}>
               <div style={S.sTitle}>⚠️ איפוס</div>
+              <div style={S.card}>
+                <div style={S.sTitle}>💾 גיבוי נתונים</div>
+                <div style={{fontSize:12,color:"#64748b",marginBottom:10}}>הורד קובץ JSON עם כל נתוני האפליקציה — סידורים, שיבוצים, עובדים, חופשות.</div>
+                <button style={{...S.btn("#1e293b"),width:"100%"}} onClick={async()=>{
+                  const snap = await getDoc(doc(db,"pharmacy","schedule"));
+                  if (!snap.exists()) { showToast("אין נתונים","err"); return; }
+                  const data = snap.data();
+                  const json = JSON.stringify(data, null, 2);
+                  const blob = new Blob([json], {type:"application/json"});
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `pharmacy-backup-${new Date().toISOString().split("T")[0]}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  showToast("גיבוי הורד ✓");
+                }}>⬇️ הורד גיבוי עכשיו</button>
+              </div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 <button style={S.btn("#ef4444")} onClick={()=>{if(window.confirm("לאפס זמינויות ושיבוצים?")) {setAvailability({});setAssigned({});setPublished(false);showToast("אופס ✓");}}}>מחק זמינויות + שיבוצים</button>
                 <button style={S.btn("#94a3b8")} onClick={()=>{if(window.confirm("לאפס הערות עובדים?")) {setEmpNotes({});showToast("הערות נמחקו");}}}>מחק הערות</button>
